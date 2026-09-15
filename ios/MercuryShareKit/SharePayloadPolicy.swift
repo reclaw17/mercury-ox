@@ -119,6 +119,10 @@ public enum SharePayloadPolicy {
             let displayName = sanitizeDisplayName(candidate.displayName)
             let mime = candidate.mimeType.map { String($0.prefix(maxMIMETypeCharacters)) }
                 .flatMap { isBlank($0) ? nil : $0 }
+            if !isAllowedShareType(mimeType: mime, displayName: displayName) {
+                rejections.append("One shared item is not an allowed file type")
+                continue
+            }
             let kind = kindOf(mimeType: mime, displayName: displayName)
             let attachment = SharedAttachment(
                 id: candidate.id,
@@ -173,6 +177,43 @@ public enum SharePayloadPolicy {
         guard !value.isEmpty, !value.hasPrefix("/"), !value.hasPrefix("\\") else { return false }
         let normalized = value.replacingOccurrences(of: "\\", with: "/")
         return !normalized.split(separator: "/", omittingEmptySubsequences: false).contains("..")
+    }
+
+    private static let rejectedExtensions: Set<String> = [
+        "apk", "apks", "aab", "dex", "exe", "msi", "dll", "scr", "com", "bat",
+        "cmd", "ps1", "sh", "bash", "zsh", "html", "htm", "svg", "xhtml", "js",
+        "mjs", "cjs", "wasm",
+    ]
+    private static let rejectedMIME: Set<String> = [
+        "image/svg+xml", "text/html", "application/xhtml+xml",
+        "application/javascript", "text/javascript", "application/x-javascript",
+        "application/vnd.android.package-archive", "application/x-msdownload",
+        "application/x-executable", "application/x-sh", "application/x-shellscript",
+    ]
+
+    public static func isAllowedShareType(mimeType: String?, displayName: String) -> Bool {
+        let mime = mimeType?.lowercased().split(separator: ";").first.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? ""
+        let ext = (displayName as NSString).pathExtension.lowercased()
+        if rejectedExtensions.contains(ext) { return false }
+        if rejectedMIME.contains(mime) { return false }
+        if mime.isEmpty || mime == "application/octet-stream" || mime == "binary/octet-stream" {
+            return [
+                "png", "jpg", "jpeg", "gif", "webp", "bmp", "heic", "heif", "avif",
+                "pdf", "txt", "md", "csv", "json", "xml", "zip", "gz", "mp3", "mp4",
+                "wav", "m4a", "webm", "mov", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+                "odt", "ods", "rtf", "epub",
+            ].contains(ext)
+        }
+        if mime.hasPrefix("image/") || mime.hasPrefix("audio/") || mime.hasPrefix("video/") || mime.hasPrefix("text/") {
+            return true
+        }
+        return [
+            "application/pdf", "application/json", "application/zip", "application/gzip",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ].contains(mime)
     }
 
     private static func rejection(existing: [SharedAttachment], candidate: SharedAttachment) -> String? {

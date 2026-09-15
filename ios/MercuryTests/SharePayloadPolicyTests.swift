@@ -56,7 +56,7 @@ final class SharePayloadPolicyTests: XCTestCase {
     func testBoundsTextMimeAndRejectsEmptyPayload() {
         let bounded = SharePayloadPolicy.build(
             text: String(repeating: "x", count: SharePayloadPolicy.maxTextCharacters + 10),
-            candidates: [candidate("mime", name: "x.bin", mime: String(repeating: "m", count: 300))]
+            candidates: [candidate("mime", name: "x.txt", mime: "text/plain;" + String(repeating: "m", count: 300))]
         )
         XCTAssertEqual(bounded.payload.text.count, SharePayloadPolicy.maxTextCharacters)
         XCTAssertEqual(bounded.payload.attachments.first?.mimeType?.count, SharePayloadPolicy.maxMIMETypeCharacters)

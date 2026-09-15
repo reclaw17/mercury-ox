@@ -353,6 +353,7 @@ private const val MAX_HOST_FILE_READ_BODY_BYTES = 1024 * 1024
 
 internal fun HttpClientConfig<*>.configureHermesHttpClient() {
     followRedirects = false
+    install(HermesCleartextGate)
     // Installed with no defaults so ordinary chat/REST requests keep their
     // engine-level timeout behaviour. Long-running `/api/audio/…` calls opt into
     // extended windows per-request via HttpRequestBuilder.audioRequestTimeout().

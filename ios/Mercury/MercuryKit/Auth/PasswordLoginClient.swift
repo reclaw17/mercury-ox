@@ -79,7 +79,7 @@ struct PasswordLoginClient: @unchecked Sendable {
 
         switch http.statusCode {
         case 200..<300:
-            persistResponseCookies(http, for: url)
+            persistResponseCookies(http, for: url, origin: origin)
         case 401, 403:
             throw PasswordLoginError.invalidCredentials
         case 408, 425, 429, 500...599:
@@ -89,19 +89,18 @@ struct PasswordLoginClient: @unchecked Sendable {
         }
     }
 
-    private func persistResponseCookies(_ response: HTTPURLResponse, for url: URL) {
+    private func persistResponseCookies(_ response: HTTPURLResponse, for url: URL, origin: String) {
         let headers = response.allHeaderFields.reduce(into: [String: String]()) { result, field in
             guard let name = field.key as? String, let value = field.value as? String else { return }
             result[name] = value
         }
         let cookies = HTTPCookie.cookies(withResponseHeaderFields: headers, for: url)
         guard !cookies.isEmpty else { return }
+        OriginCookieStore.shared.store(cookies, origin: origin)
+        let filtered = OriginCookiePolicy.filter(cookies, requestURL: url, origin: origin)
         let configuredStore = session.configuration.httpCookieStorage
-        for cookie in cookies {
+        for cookie in filtered {
             configuredStore?.setCookie(cookie)
-            if configuredStore !== HTTPCookieStorage.shared {
-                HTTPCookieStorage.shared.setCookie(cookie)
-            }
         }
     }
 }

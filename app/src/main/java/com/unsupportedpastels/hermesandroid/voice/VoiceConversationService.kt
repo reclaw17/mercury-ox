@@ -114,6 +114,7 @@ class VoiceConversationService : Service() {
             .setContentText(stateLabel)
             .setOngoing(true)
             .setSilent(true)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .addAction(0, "Stop", stopIntent)
             .build()
     }

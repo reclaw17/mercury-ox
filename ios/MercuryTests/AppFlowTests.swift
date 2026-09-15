@@ -967,7 +967,7 @@ final class AppFlowTests: XCTestCase {
         XCTAssertEqual(model.connectionPhase, .disconnected)
     }
 
-    func testSubdomainCookieIsPurgedWithParentOriginSignOut() {
+    func testCookiePurgeMatchesExactHostOnly() {
         let cookie = HTTPCookie(
             properties: [.domain: ".hermes.test", .path: "/", .name: "sid", .value: "t"]
         )!
@@ -975,7 +975,7 @@ final class AppFlowTests: XCTestCase {
         let subdomainCookie = HTTPCookie(
             properties: [.domain: ".api.hermes.test", .path: "/", .name: "sid", .value: "t"]
         )!
-        XCTAssertTrue(ConnectionController.cookie(subdomainCookie, coversHost: "hermes.test"))
+        XCTAssertFalse(ConnectionController.cookie(subdomainCookie, coversHost: "hermes.test"))
         let foreign = HTTPCookie(
             properties: [.domain: ".not-hermes.test", .path: "/", .name: "sid", .value: "t"]
         )!

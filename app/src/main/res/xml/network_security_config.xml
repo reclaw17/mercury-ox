@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network security config replaces the previous global usesCleartextTraffic=true.
+
+  Android's domain-config matches hostnames, not CIDR, so RFC1918 LAN IPs cannot
+  be listed here. Cleartext to those addresses is required for local Hermes
+  (`http://192.168.x.x`) and is therefore permitted at the OS layer, then
+  denied for public / mDNS / Tailscale CGNAT hosts by ServerOriginPolicy on
+  every request — not only when the user types an origin.
+
+  Trust anchors are system CAs only: a user-installed CA cannot MITM Hermes
+  Cloud or Relay. SPKI pins for portal.nousresearch.com are intentionally
+  omitted; certificate rotation would brick Cloud sign-in. Operators who want
+  pins can add a pin-set here after publishing backup hashes.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+    </domain-config>
+
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">nousresearch.com</domain>
+        <domain includeSubdomains="true">portal.nousresearch.com</domain>
+        <domain includeSubdomains="true">agents.nousresearch.com</domain>
+    </domain-config>
+</network-security-config>

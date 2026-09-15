@@ -67,4 +67,19 @@ class SharePayloadPolicyTest {
         assertTrue(empty.payload.isEmpty)
         assertTrue(empty.rejections.isNotEmpty())
     }
+
+    @Test
+    fun rejectsExecutablesHtmlAndSvgEvenWhenUriLooksSafe() {
+        val result = SharePayloadPolicy.build(
+            text = null,
+            candidates = listOf(
+                SharedAttachmentCandidate("content://provider/evil", "drop.apk", "application/vnd.android.package-archive", 10),
+                SharedAttachmentCandidate("content://provider/page", "index.html", "text/html", 10),
+                SharedAttachmentCandidate("content://provider/icon", "icon.svg", "image/svg+xml", 10),
+                SharedAttachmentCandidate("content://provider/ok", "notes.txt", "text/plain", 10),
+            ),
+        )
+        assertEquals(listOf("notes.txt"), result.payload.attachments.map { it.displayName })
+        assertEquals(3, result.rejections.size)
+    }
 }

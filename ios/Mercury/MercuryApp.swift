@@ -74,6 +74,14 @@ struct MercuryApp: App {
             }
         }
         UNUserNotificationCenter.current().delegate = delegate
+        let sensitive = UNNotificationCategory(
+            identifier: "MERCURY_SENSITIVE",
+            actions: [],
+            intentIdentifiers: [],
+            hiddenPreviewsBodyPlaceholder: "Open Mercury to read",
+            options: [.hiddenPreviewsShowTitle]
+        )
+        UNUserNotificationCenter.current().setNotificationCategories([sensitive])
         Self.applyLaunchArgOverrides(to: model)
         Self.registerBackgroundReconciliation(for: model)
     }

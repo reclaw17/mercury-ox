@@ -30,7 +30,16 @@ enum HermesURLSession {
         )
     }
 
-    /// Process-wide default for Hermes-origin clients. Same configuration as
-    /// `URLSession.shared` (default, shared cookie storage) minus redirects.
-    static let noRedirects: URLSession = make(.default)
+    /// Process-wide default for Hermes-origin clients. Ephemeral, no shared
+    /// cookie jar: basic-auth cookies live in `OriginCookieStore` (Keychain,
+    /// origin-scoped) so they cannot leak across scheme or port.
+    static let noRedirects: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.httpCookieStorage = nil
+        config.httpShouldSetCookies = false
+        config.httpCookieAcceptPolicy = .never
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.timeoutIntervalForRequest = 20
+        return make(config)
+    }()
 }

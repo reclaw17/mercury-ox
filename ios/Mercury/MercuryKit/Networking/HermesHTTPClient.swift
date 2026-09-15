@@ -7,8 +7,8 @@ struct ResponseTooLargeError: Error {}
 /// Minimal URLSession-based HTTP client for the Hermes `serve` API.
 ///
 /// - Builds requests from a normalized origin plus path/query items.
-/// - Shares the process-wide `HTTPCookieStorage` so `Set-Cookie` values
-///   (e.g. the session cookie) are stored and replayed automatically.
+/// - Origin-scoped cookies live in `OriginCookieStore` (Keychain, ThisDeviceOnly)
+///   and are replayed only for the same scheme+host+port.
 /// - Enforces a 64 KiB response cap to bound memory on untrusted payloads.
 ///
 /// Logging policy: this type never logs request headers, cookies, or URLs
@@ -58,11 +58,11 @@ final class HermesHTTPClient {
     init(origin: String) {
         self.origin = ServerOrigin.normalize(origin) ?? origin
         let config = URLSessionConfiguration.ephemeral
-        // Route cookie handling through the shared store even though the rest
-        // of the session is ephemeral: Set-Cookie responses are persisted here
-        // and resent on subsequent requests to matching hosts.
-        config.httpCookieStorage = HTTPCookieStorage.shared
-        config.httpShouldSetCookies = true
+        // Basic-auth cookies are origin-scoped in OriginCookieStore (Keychain),
+        // not the process-wide HTTPCookieStorage (domain-only, not origin).
+        config.httpCookieStorage = nil
+        config.httpShouldSetCookies = false
+        config.httpCookieAcceptPolicy = .never
         config.timeoutIntervalForRequest = 20
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         self.session = HermesURLSession.make(config)
@@ -102,15 +102,6 @@ final class HermesHTTPClient {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        // Replay stored cookies explicitly: URLProtocol-based test sessions and
-        // some configurations don't auto-attach them from the shared store.
-        if let storage = session.configuration.httpCookieStorage {
-            let cookies = storage.cookies(for: url) ?? []
-            if !cookies.isEmpty {
-                let header = HTTPCookie.requestHeaderFields(with: cookies)["Cookie"] ?? ""
-                request.setValue(header, forHTTPHeaderField: "Cookie")
-            }
-        }
         return try await run(request, maximumResponseBytes: maximumResponseBytes)
     }
 
@@ -156,6 +147,7 @@ final class HermesHTTPClient {
         var components = try urlComponents(path: "/api/files/download")
         components.queryItems = [URLQueryItem(name: "path", value: path)]
         guard let url = components.url else { throw URLError(.badURL) }
+        try denyIfCleartextBlocked(url)
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("image/*", forHTTPHeaderField: "Accept")
@@ -165,12 +157,7 @@ final class HermesHTTPClient {
             if let bearerToken, !bearerToken.isEmpty {
                 authenticated.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
             }
-            if let cookies = session.configuration.httpCookieStorage?.cookies(for: url), !cookies.isEmpty {
-                authenticated.setValue(
-                    HTTPCookie.requestHeaderFields(with: cookies)["Cookie"],
-                    forHTTPHeaderField: "Cookie"
-                )
-            }
+            attachCookies(&authenticated, url: url)
             return authenticated
         }
 
@@ -206,6 +193,7 @@ final class HermesHTTPClient {
         var components = try urlComponents(path: "/api/files/download")
         components.queryItems = [URLQueryItem(name: "path", value: path)]
         guard let url = components.url else { throw URLError(.badURL) }
+        try denyIfCleartextBlocked(url)
         let directory = try ManagedVideoCache.directory(origin: origin, profile: profile)
         func request() -> URLRequest {
             var request = URLRequest(url: url)
@@ -214,9 +202,7 @@ final class HermesHTTPClient {
             if let bearerToken, !bearerToken.isEmpty {
                 request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
             }
-            if let cookies = session.configuration.httpCookieStorage?.cookies(for: url), !cookies.isEmpty {
-                request.setValue(HTTPCookie.requestHeaderFields(with: cookies)["Cookie"], forHTTPHeaderField: "Cookie")
-            }
+            attachCookies(&request, url: url)
             return request
         }
         try Task.checkCancellation()
@@ -325,6 +311,14 @@ final class HermesHTTPClient {
         if let bearerToken, !bearerToken.isEmpty {
             request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
         }
+        if let url = request.url {
+            do {
+                try denyIfCleartextBlocked(url)
+            } catch {
+                throw TransportError(underlying: error)
+            }
+            attachCookies(&request, url: url)
+        }
         let data: Data
         let response: URLResponse
         do {
@@ -334,6 +328,9 @@ final class HermesHTTPClient {
         }
         guard let http = response as? HTTPURLResponse else {
             throw TransportError(underlying: URLError(.badServerResponse))
+        }
+        if let url = request.url {
+            persistCookies(http, for: url)
         }
         guard data.count <= maximumResponseBytes else {
             throw ResponseTooLargeError()
@@ -359,6 +356,14 @@ final class HermesHTTPClient {
         if let bearerToken, !bearerToken.isEmpty {
             request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
         }
+        if let url = request.url {
+            do {
+                try denyIfCleartextBlocked(url)
+            } catch {
+                throw TransportError(underlying: error)
+            }
+            attachCookies(&request, url: url)
+        }
         let data: Data
         let response: URLResponse
         do {
@@ -368,6 +373,9 @@ final class HermesHTTPClient {
         }
         guard let http = response as? HTTPURLResponse else {
             throw TransportError(underlying: URLError(.badServerResponse))
+        }
+        if let url = request.url {
+            persistCookies(http, for: url)
         }
         guard data.count <= maximumResponseBytes else {
             throw ResponseTooLargeError()
@@ -410,5 +418,38 @@ final class HermesHTTPClient {
         guard let tokens, !tokens.accessToken.isEmpty else { return false }
         bearerToken = tokens.accessToken
         return true
+    }
+
+    private func denyIfCleartextBlocked(_ url: URL) throws {
+        guard ServerOrigin.requestURLAllowed(url.absoluteString) else {
+            throw URLError(.appTransportSecurityRequiresSecureConnection)
+        }
+    }
+
+    private func attachCookies(_ request: inout URLRequest, url: URL) {
+        let fromStore = OriginCookieStore.shared.cookies(forOrigin: origin)
+        let fromSession = session.configuration.httpCookieStorage?.cookies(for: url) ?? []
+        let cookies = OriginCookiePolicy.filter(fromStore + fromSession, requestURL: url, origin: origin)
+        guard !cookies.isEmpty else { return }
+        request.setValue(
+            HTTPCookie.requestHeaderFields(with: cookies)["Cookie"],
+            forHTTPHeaderField: "Cookie"
+        )
+    }
+
+    private func persistCookies(_ response: HTTPURLResponse, for url: URL) {
+        OriginCookieStore.shared.merge(response: response, for: url, origin: origin)
+        let headers = response.allHeaderFields.reduce(into: [String: String]()) { result, field in
+            guard let name = field.key as? String, let value = field.value as? String else { return }
+            result[name] = value
+        }
+        let cookies = OriginCookiePolicy.filter(
+            HTTPCookie.cookies(withResponseHeaderFields: headers, for: url),
+            requestURL: url,
+            origin: origin
+        )
+        for cookie in cookies {
+            session.configuration.httpCookieStorage?.setCookie(cookie)
+        }
     }
 }
