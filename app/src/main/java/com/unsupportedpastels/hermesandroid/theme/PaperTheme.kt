@@ -15,10 +15,13 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -159,3 +162,36 @@ internal fun PaperOutlinedButton(
         },
     )
 }
+
+/** List, dock, and detail dividers. Standard keeps the Material default. */
+@Composable
+internal fun ReadingPaneDivider(modifier: Modifier = Modifier) {
+    if (LocalReadingProfile.current == ReadingProfile.Paper) {
+        HorizontalDivider(
+            modifier = modifier,
+            thickness = PaperDividerThickness,
+            color = MaterialTheme.colorScheme.outline,
+        )
+    } else {
+        HorizontalDivider(modifier = modifier)
+    }
+}
+
+/** White pane fill on Paper. Standard keeps the gray container role passed in. */
+@Composable
+internal fun readingPaneColor(standard: Color): Color =
+    if (LocalReadingProfile.current == ReadingProfile.Paper) {
+        MaterialTheme.colorScheme.surface
+    } else {
+        standard
+    }
+
+/** 1 dp frame for Paper surfaces that must not use a gray fill. */
+@Composable
+internal fun readingFrameBorder(): BorderStroke? =
+    if (LocalReadingProfile.current == ReadingProfile.Paper) {
+        BorderStroke(PaperDividerThickness, MaterialTheme.colorScheme.outline)
+    } else {
+        null
+    }
+

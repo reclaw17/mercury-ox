@@ -164,6 +164,22 @@ private fun screenshotWorkspaceSnapshot(): HermesGatewaySnapshot = screenshotPro
     ),
 )
 
+private val screenshotPaperCodeBody = (1..14).joinToString(separator = "\n") { "line %02d".format(it) }
+
+private fun screenshotPaperTranscriptSnapshot(): HermesGatewaySnapshot = screenshotProjectSnapshot().copy(
+    chatSessions = mapOf(
+        screenshotAlphaWorkspaceSession.id to ChatSessionSnapshot(
+            messages = listOf(
+                ChatMessage(ChatMessageRole.User, "Show the workspace diff."),
+                ChatMessage(
+                    ChatMessageRole.Assistant,
+                    "Closed fence:\n\n```kotlin\n$screenshotPaperCodeBody\n```",
+                ),
+            ),
+        ),
+    ),
+)
+
 private fun screenshotActiveSessionSnapshot(): HermesGatewaySnapshot = screenshotProjectSnapshot().copy(
     activeRuntimes = listOf(
         ActiveRuntimeSession(
@@ -396,6 +412,63 @@ fun HermesPaperExpandedLargeTextScreenshot() {
         HermesAndroidTheme(darkTheme = false, profile = ReadingProfile.Paper) {
             HermesApp(
                 snapshot = screenshotWorkspaceSnapshot(),
+                initialRoute = SessionDetailRoute(screenshotAlphaWorkspaceSession.id),
+                serverSettingsState = screenshotServerSettings,
+                readingPreference = ReadingProfilePreference.Paper,
+                resolvedReadingProfile = ReadingProfile.Paper,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Paper compact transcript", widthDp = 400, heightDp = 900, showBackground = true)
+@Composable
+fun HermesPaperCompactTranscriptScreenshot() {
+    ScreenshotNavigationHost {
+        HermesAndroidTheme(darkTheme = false, profile = ReadingProfile.Paper) {
+            HermesApp(
+                snapshot = screenshotPaperTranscriptSnapshot(),
+                initialRoute = SessionDetailRoute(screenshotAlphaWorkspaceSession.id),
+                serverSettingsState = screenshotServerSettings,
+                readingPreference = ReadingProfilePreference.Paper,
+                resolvedReadingProfile = ReadingProfile.Paper,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Paper expanded transcript", widthDp = 1200, heightDp = 900, showBackground = true)
+@Composable
+fun HermesPaperExpandedTranscriptScreenshot() {
+    ScreenshotNavigationHost {
+        HermesAndroidTheme(darkTheme = false, profile = ReadingProfile.Paper) {
+            HermesApp(
+                snapshot = screenshotPaperTranscriptSnapshot(),
+                initialRoute = SessionDetailRoute(screenshotAlphaWorkspaceSession.id),
+                serverSettingsState = screenshotServerSettings,
+                readingPreference = ReadingProfilePreference.Paper,
+                resolvedReadingProfile = ReadingProfile.Paper,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(
+    name = "Paper compact transcript large text",
+    widthDp = 400,
+    heightDp = 900,
+    fontScale = 1.5f,
+    showBackground = true,
+)
+@Composable
+fun HermesPaperCompactTranscriptLargeTextScreenshot() {
+    ScreenshotNavigationHost {
+        HermesAndroidTheme(darkTheme = false, profile = ReadingProfile.Paper) {
+            HermesApp(
+                snapshot = screenshotPaperTranscriptSnapshot(),
                 initialRoute = SessionDetailRoute(screenshotAlphaWorkspaceSession.id),
                 serverSettingsState = screenshotServerSettings,
                 readingPreference = ReadingProfilePreference.Paper,

@@ -1,6 +1,7 @@
 package com.unsupportedpastels.hermesandroid.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -46,6 +48,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import com.unsupportedpastels.hermesandroid.files.ManagedVideoMedia
+import com.unsupportedpastels.hermesandroid.theme.LocalReadingProfile
+import com.unsupportedpastels.hermesandroid.theme.readingFrameBorder
 import com.unsupportedpastels.mercury.core.artifacts.ArtifactExtractor
 import com.unsupportedpastels.mercury.core.artifacts.ManagedImageContentSegmentKind
 import com.unsupportedpastels.mercury.core.artifacts.ManagedImageFormatPolicy
@@ -835,12 +839,25 @@ private fun annotatedMarkdown(inlines: List<MarkdownInline>): AnnotatedString {
 @Composable
 private fun MarkdownCode(block: MarkdownCodeBlock) {
     val clipboard = LocalClipboardManager.current
+    val paper = LocalReadingProfile.current == ReadingProfile.Paper
+    var expanded by rememberSaveable(block.code) { mutableStateOf(false) }
+    val preview = if (paper) paperCodePreview(block.code, expanded) else null
+    val visibleCode = preview?.text ?: block.code
+    val shape = RoundedCornerShape(12.dp)
+    val frame = readingFrameBorder()
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(12.dp),
+                if (paper) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant,
+                shape,
+            )
+            .then(
+                if (frame != null) {
+                    Modifier.border(frame, shape)
+                } else {
+                    Modifier
+                },
             ),
     ) {
         Row(
@@ -852,7 +869,11 @@ private fun MarkdownCode(block: MarkdownCodeBlock) {
             Text(
                 text = block.language?.lowercase() ?: "code",
                 modifier = Modifier.weight(1f),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (paper) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -860,14 +881,18 @@ private fun MarkdownCode(block: MarkdownCodeBlock) {
             IconButton(
                 onClick = { clipboard.setText(AnnotatedString(block.code)) },
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(if (paper) 48.dp else 32.dp)
                     .semantics { contentDescription = "Copy code" },
             ) {
                 Icon(
                     Icons.Outlined.ContentCopy,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (paper) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                 )
             }
         }
@@ -878,11 +903,23 @@ private fun MarkdownCode(block: MarkdownCodeBlock) {
                 .padding(start = 12.dp, end = 12.dp, bottom = 10.dp),
         ) {
             Text(
-                text = block.code,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = visibleCode,
+                color = if (paper) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
                 fontFamily = FontFamily.Monospace,
                 style = MaterialTheme.typography.bodyMedium,
             )
+        }
+        if (preview?.canExpand == true) {
+            TextButton(
+                onClick = { expanded = true },
+                modifier = Modifier.padding(start = 4.dp),
+            ) {
+                Text("Show more")
+            }
         }
     }
 }

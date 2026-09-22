@@ -49,7 +49,10 @@ import com.unsupportedpastels.hermesandroid.gateway.ChatMessage
 import com.unsupportedpastels.hermesandroid.gateway.ChatSessionSnapshot
 import com.unsupportedpastels.hermesandroid.files.ManagedVideoMedia
 import com.unsupportedpastels.hermesandroid.theme.LocalHermesSemanticColors
+import com.unsupportedpastels.hermesandroid.theme.LocalReadingProfile
 import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
+import com.unsupportedpastels.hermesandroid.theme.readingFrameBorder
+import com.unsupportedpastels.hermesandroid.theme.readingPaneColor
 import com.unsupportedpastels.mercury.core.transcript.TranscriptPresentationPolicy
 
 /** Native identities and payloads retained around the shared turn policy. */
@@ -113,7 +116,9 @@ internal fun TurnActivityGroup(
     val ruleColor = MaterialTheme.colorScheme.outlineVariant
     Column {
         Row(
-            modifier = Modifier.fillMaxWidth().height(32.dp).testTag("Turn activity")
+            modifier = Modifier.fillMaxWidth()
+                .height(if (LocalReadingProfile.current == ReadingProfile.Paper) 48.dp else 32.dp)
+                .testTag("Turn activity")
                 .clickable(onClick = onToggle)
                 .semantics(mergeDescendants = true) {
                     contentDescription = "Activity, $count $noun, ${if (expanded) "expanded" else "collapsed"}"
@@ -322,7 +327,8 @@ internal fun ToolActivityGroup(
     Surface(
         onClick = onToggle,
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = readingPaneColor(MaterialTheme.colorScheme.surfaceContainerLow),
+        border = readingFrameBorder(),
         modifier = Modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
@@ -341,9 +347,9 @@ internal fun ToolActivityGroup(
             ) {
                 if (anyRunning) {
                     if (paperSuppressesMotion()) {
-                        StaticWorkMark(
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
+                        Text(
+                            "Running",
+                            style = MaterialTheme.typography.labelMedium,
                             color = semanticColors.active,
                         )
                     } else {
@@ -407,7 +413,8 @@ internal fun ToolMessageBlock(
     Surface(
         onClick = onToggle,
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = readingPaneColor(MaterialTheme.colorScheme.surfaceContainerLow),
+        border = readingFrameBorder(),
         modifier = Modifier
             .fillMaxWidth()
             .semantics {
@@ -489,7 +496,8 @@ internal fun TranscriptToolRunGroup(
     Surface(
         onClick = onToggle,
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = readingPaneColor(MaterialTheme.colorScheme.surfaceContainerLow),
+        border = readingFrameBorder(),
         modifier = Modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
@@ -570,7 +578,8 @@ internal fun WorkBurstGroup(
     Surface(
         onClick = onToggle,
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = readingPaneColor(MaterialTheme.colorScheme.surfaceContainerLow),
+        border = readingFrameBorder(),
         modifier = Modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {

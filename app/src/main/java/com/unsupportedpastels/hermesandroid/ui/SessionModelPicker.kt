@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -77,7 +78,9 @@ internal fun ModelPickerSheet(
                         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        if (!paperSuppressesMotion()) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        }
                         Text("Loading models…")
                     }
                 }
@@ -208,7 +211,9 @@ private fun ModelPickerReadyContent(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CircularProgressIndicator(modifier = Modifier.size(20.dp))
+            if (!paperSuppressesMotion()) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp))
+            }
             Text("Applying model…")
         }
     }
