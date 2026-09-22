@@ -1,17 +1,25 @@
 package com.unsupportedpastels.hermesandroid.ui
 
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import java.io.ByteArrayOutputStream
 import java.net.InetAddress
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 private fun inetAddress(value: String): InetAddress = InetAddress.getByName(value)
 
@@ -147,5 +155,96 @@ class RemoteMediaImageTest {
         assertEquals(302, (result as RemoteImageDownloadResult.HttpFailure).statusCode)
         assertEquals(1, requests)
         client.close()
+    }
+
+    @Test
+    fun paperSamples3000By1000Below1280AndStandardStaysAt2048() {
+        assertEquals(2_048, MAX_REMOTE_IMAGE_RENDER_DIMENSION)
+        assertEquals(1_280, PAPER_REMOTE_IMAGE_RENDER_DIMENSION)
+        assertEquals(4, MAX_REMOTE_IMAGE_CACHE_ENTRIES)
+        val paperSample = remoteImageSampleSize(
+            width = 3_000,
+            height = 1_000,
+            maxRenderDimension = remoteImageRenderDimension(ReadingProfile.Paper),
+        )
+        val standardSample = remoteImageSampleSize(
+            width = 3_000,
+            height = 1_000,
+            maxRenderDimension = remoteImageRenderDimension(ReadingProfile.Standard),
+        )
+        assertEquals(4, paperSample)
+        assertEquals(2, standardSample)
+        assertTrue(3_000 / paperSample <= PAPER_REMOTE_IMAGE_RENDER_DIMENSION)
+        assertTrue(1_000 / paperSample <= PAPER_REMOTE_IMAGE_RENDER_DIMENSION)
+        assertTrue(3_000 / standardSample <= MAX_REMOTE_IMAGE_RENDER_DIMENSION)
+        assertTrue(3_000 / standardSample > PAPER_REMOTE_IMAGE_RENDER_DIMENSION)
+    }
+
+    @Test
+    fun cacheEvictionStillCapsAtFour() {
+        val cache = AccessOrderLruCache<String>(MAX_REMOTE_IMAGE_CACHE_ENTRIES)
+        repeat(5) { index -> cache.put("image-$index", "bitmap-$index") }
+        assertEquals(4, cache.size())
+        assertFalse(cache.contains("image-0"))
+        assertTrue(cache.contains("image-1"))
+        assertTrue(cache.contains("image-4"))
+    }
+
+    @Test
+    fun paperLeaveDropsPaperKeysAndKeepsStandardKeys() {
+        val cache = AccessOrderLruCache<String>(MAX_REMOTE_IMAGE_CACHE_ENTRIES)
+        val standard = profileScopedCacheKey("https://cdn.example/a.png", ReadingProfile.Standard)
+        val paper = profileScopedCacheKey("https://cdn.example/b.png", ReadingProfile.Paper)
+        cache.put(standard, "standard")
+        cache.put(paper, "paper")
+        cache.removeWhere(::isPaperBitmapCacheKey)
+        assertEquals("https://cdn.example/a.png", standard)
+        assertTrue(cache.contains(standard))
+        assertFalse(cache.contains(paper))
+        assertEquals(1, cache.size())
+    }
+}
+
+@RunWith(AndroidJUnit4::class)
+@Config(sdk = [35])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class RemoteMediaImageDecodeTest {
+    @Test
+    fun source3000By1000SamplesToPaper1280AndStandard2048() {
+        val bytes = pngBytes(width = 3_000, height = 1_000)
+        val paper = decodeRemoteImage(bytes, ReadingProfile.Paper)
+        val standard = decodeRemoteImage(bytes, ReadingProfile.Standard)
+        assertNotNull(paper)
+        assertNotNull(standard)
+        val paperLongEdge = maxOf(paper!!.width, paper.height)
+        val standardLongEdge = maxOf(standard!!.width, standard.height)
+        assertTrue("paper long edge $paperLongEdge", paperLongEdge <= 1_280)
+        assertTrue("standard long edge $standardLongEdge", standardLongEdge <= 2_048)
+        assertTrue("standard long edge $standardLongEdge", standardLongEdge > 1_280)
+    }
+
+    @Test
+    fun runtimeCacheEvictsTheFifthBitmap() {
+        RemoteImageRuntime.clearForTest()
+        try {
+            repeat(5) { index ->
+                val bitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+                    .asImageBitmap()
+                RemoteImageRuntime.cache("https://cdn.example/cache-$index.png", bitmap)
+            }
+            assertEquals(4, RemoteImageRuntime.sizeForTest())
+            assertFalse(RemoteImageRuntime.containsForTest("https://cdn.example/cache-0.png"))
+            assertTrue(RemoteImageRuntime.containsForTest("https://cdn.example/cache-4.png"))
+        } finally {
+            RemoteImageRuntime.clearForTest()
+        }
+    }
+
+    private fun pngBytes(width: Int, height: Int): ByteArray {
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val stream = ByteArrayOutputStream()
+        check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream))
+        bitmap.recycle()
+        return stream.toByteArray()
     }
 }

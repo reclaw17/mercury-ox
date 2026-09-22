@@ -2,6 +2,9 @@ package com.unsupportedpastels.hermesandroid.ui
 
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import com.unsupportedpastels.hermesandroid.app.DurableSessionId
+import com.unsupportedpastels.hermesandroid.app.SessionSummary
+import com.unsupportedpastels.hermesandroid.gateway.ChatSessionSnapshot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -136,5 +139,116 @@ class RemoteMediaImageUiTest {
                         ?.startsWith("Zoom 1") == false
                 },
             )
+    }
+
+    @Test
+    fun leavingPaperSessionDropsPaperBitmapsAndKeepsStandardCache() {
+        val paperImage = profileScopedCacheKey("https://cdn.example/paper-leave.png", ReadingProfile.Paper)
+        val standardImage = profileScopedCacheKey("https://cdn.example/standard-leave.png", ReadingProfile.Standard)
+        val paperPoster = profileScopedCacheKey("/tmp/paper-leave.mp4", ReadingProfile.Paper)
+        val standardPoster = profileScopedCacheKey("/tmp/standard-leave.mp4", ReadingProfile.Standard)
+        RemoteImageRuntime.clearForTest()
+        ManagedVideoPosterRuntime.clearForTest()
+        RemoteImageRuntime.cache(paperImage, tinyBitmap())
+        RemoteImageRuntime.cache(standardImage, tinyBitmap())
+        ManagedVideoPosterRuntime.put(paperPoster, tinyBitmap())
+        ManagedVideoPosterRuntime.put(standardPoster, tinyBitmap())
+        val showSession = androidx.compose.runtime.mutableStateOf(true)
+        try {
+            composeRule.setContent {
+                if (showSession.value) {
+                    HermesAndroidTheme(profile = ReadingProfile.Paper) {
+                        SessionScreen(ReadingProfile.Paper)
+                    }
+                }
+            }
+            composeRule.waitForIdle()
+            org.junit.Assert.assertTrue(RemoteImageRuntime.containsForTest(paperImage))
+            org.junit.Assert.assertTrue(ManagedVideoPosterRuntime.containsForTest(paperPoster))
+            composeRule.runOnIdle { showSession.value = false }
+            composeRule.waitForIdle()
+            org.junit.Assert.assertFalse(RemoteImageRuntime.containsForTest(paperImage))
+            org.junit.Assert.assertFalse(ManagedVideoPosterRuntime.containsForTest(paperPoster))
+            org.junit.Assert.assertTrue(RemoteImageRuntime.containsForTest(standardImage))
+            org.junit.Assert.assertTrue(ManagedVideoPosterRuntime.containsForTest(standardPoster))
+        } finally {
+            RemoteImageRuntime.clearForTest()
+            ManagedVideoPosterRuntime.clearForTest()
+        }
+    }
+
+    @Test
+    fun leavingStandardSessionKeepsProcessImageCache() {
+        val standardImage = profileScopedCacheKey("https://cdn.example/standard-keep.png", ReadingProfile.Standard)
+        val standardPoster = profileScopedCacheKey("/tmp/standard-keep.mp4", ReadingProfile.Standard)
+        RemoteImageRuntime.clearForTest()
+        ManagedVideoPosterRuntime.clearForTest()
+        RemoteImageRuntime.cache(standardImage, tinyBitmap())
+        ManagedVideoPosterRuntime.put(standardPoster, tinyBitmap())
+        val showSession = androidx.compose.runtime.mutableStateOf(true)
+        try {
+            composeRule.setContent {
+                if (showSession.value) {
+                    HermesAndroidTheme(profile = ReadingProfile.Standard) {
+                        SessionScreen(ReadingProfile.Standard)
+                    }
+                }
+            }
+            composeRule.waitForIdle()
+            composeRule.runOnIdle { showSession.value = false }
+            composeRule.waitForIdle()
+            org.junit.Assert.assertTrue(RemoteImageRuntime.containsForTest(standardImage))
+            org.junit.Assert.assertTrue(ManagedVideoPosterRuntime.containsForTest(standardPoster))
+        } finally {
+            RemoteImageRuntime.clearForTest()
+            ManagedVideoPosterRuntime.clearForTest()
+        }
+    }
+
+    private fun tinyBitmap() = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888).asImageBitmap()
+
+    @androidx.compose.runtime.Composable
+    private fun SessionScreen(profile: ReadingProfile) {
+        SessionDetailScreen(
+            session = SessionSummary(
+                id = DurableSessionId("media-limits"),
+                title = "Media",
+                preview = "",
+            ),
+            chat = ChatSessionSnapshot(),
+            voiceInputScopeKey = "media-limits",
+            draft = "",
+            onDraftChanged = {},
+            canSend = false,
+            attachments = emptyList(),
+            hostReferences = emptyList(),
+            onAddAttachments = { emptyList() },
+            onRemoveAttachment = {},
+            onRemoveHostReference = {},
+            onSend = {},
+            onSteer = {},
+            onReasoningSelected = {},
+            onFastSelected = {},
+            onOpenModelPicker = {},
+            onClarificationResponse = { _, _, _ -> },
+            onApprovalResponse = { _, _ -> },
+            onBlockingResponse = { _, _, _ -> },
+            showStop = false,
+            stopping = false,
+            onStop = {},
+            onLoadSessionInsights = {},
+            maintenanceAvailable = false,
+            maintenanceEnabled = false,
+            onCompressSession = {},
+            onUndoSession = {},
+            onBranchSession = { _, _ -> },
+            showBack = true,
+            onBack = {},
+            onLoadManagedImage = { Result.failure(IllegalStateException("unused")) },
+            onLoadHostFiles = { Result.failure(IllegalStateException("unused")) },
+            onLoadManagedFile = { Result.failure(IllegalStateException("unused")) },
+            onAttachHostReference = {},
+            readingProfile = profile,
+        )
     }
 }
