@@ -295,7 +295,16 @@ internal fun SessionDetailScreen(
     }
     val hasRunStateContent = chat.runState.hasVisibleContent()
     val turnActive = chat.isSending || connectionBusy || pendingSend != null
-    val transcriptEntries = remember(chat.messages, turnActive) { foldTranscriptTurns(chat.messages, turnActive) }
+    // Paper projects transcript frames. Standard keeps the source list on this frame.
+    val transcriptCadence = rememberTranscriptUiCadence(
+        sessionKey = session.id.value,
+        messages = chat.messages,
+        limited = paperReading,
+    )
+    val renderedMessages = if (paperReading) transcriptCadence.publishedMessages else chat.messages
+    val transcriptEntries = remember(renderedMessages, turnActive) {
+        foldTranscriptTurns(renderedMessages, turnActive)
+    }
     var showActivity by remember(session.id) { mutableStateOf(false) }
     var activityNow by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(session.id) {
@@ -386,19 +395,20 @@ internal fun SessionDetailScreen(
             initialScrollDone = true
         }
     }
-    var lastFollowedMessageCount by remember(session.id) { mutableStateOf(chat.messages.size) }
+    var lastFollowedMessageCount by remember(session.id) { mutableStateOf(renderedMessages.size) }
     LaunchedEffect(
         transcriptEntries.size,
         turnActive,
-        chat.messages.size,
-        chat.messages.lastOrNull()?.text?.length,
+        renderedMessages.size,
+        renderedMessages.lastOrNull()?.text?.length,
         chat.runState,
         paperReading,
     ) {
-        if (chat.messages.isEmpty() && !hasRunStateContent) return@LaunchedEffect
+        if (renderedMessages.isEmpty() && !hasRunStateContent) return@LaunchedEffect
+        // Scrolled up (followBottom cleared by drag) keeps the anchor.
         if (!followBottom) return@LaunchedEffect
-        if (chat.messages.size != lastFollowedMessageCount) {
-            lastFollowedMessageCount = chat.messages.size
+        if (renderedMessages.size != lastFollowedMessageCount) {
+            lastFollowedMessageCount = renderedMessages.size
             if (paperReading) {
                 transcriptListState.scrollToItem(timelineLastIndex, TranscriptEndScrollOffset)
             } else {
@@ -587,31 +597,64 @@ internal fun SessionDetailScreen(
                                         }
                                     }
                                     message.role == ChatMessageRole.Assistant && message.isStreaming -> {
-                                        // Only the tail past the last finalized block renders as
-                                        // plain text: parsing partial markdown (unclosed code
-                                        // fences, stray bold markers, half-built tables) garbles
-                                        // output, but blocks terminated by a blank line are
-                                        // complete and safe to render.
-                                        val stableLength = remember(renderedText) {
-                                            stableMarkdownPrefixLength(renderedText)
-                                        }
-                                        if (stableLength > 0) {
-                                            MarkdownMessage(
-                                                renderedText.substring(0, stableLength),
-                                                loadManagedImage = { path ->
-                                                    onLoadManagedImage(path).getOrThrow()
-                                                },
-                                                loadManagedVideo = onLoadManagedVideo,
-                                                peekManagedVideo = onPeekManagedVideo,
-                                            )
-                                        }
-                                        val streamingTail = renderedText.substring(stableLength)
-                                        if (streamingTail.isNotEmpty()) {
-                                            Text(
-                                                streamingTail,
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                modifier = Modifier.testTag("Streaming assistant text"),
-                                            )
+                                        if (paperReading) {
+                                            val row = transcriptCadence.rows.getOrNull(entry.index)
+                                            val segments = row?.stablePrefixSegments.orEmpty()
+                                            val streamingTail = row?.streamingTail ?: renderedText
+                                            if (segments.isEmpty() && streamingTail.isEmpty()) {
+                                                Text(
+                                                    "…",
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    modifier = Modifier.testTag("Streaming assistant text"),
+                                                )
+                                            } else {
+                                                segments.forEachIndexed { index, segment ->
+                                                    key(index) {
+                                                        MarkdownMessage(
+                                                            segment,
+                                                            loadManagedImage = { path ->
+                                                                onLoadManagedImage(path).getOrThrow()
+                                                            },
+                                                            loadManagedVideo = onLoadManagedVideo,
+                                                            peekManagedVideo = onPeekManagedVideo,
+                                                        )
+                                                    }
+                                                }
+                                                if (streamingTail.isNotEmpty()) {
+                                                    Text(
+                                                        streamingTail,
+                                                        style = MaterialTheme.typography.bodyLarge,
+                                                        modifier = Modifier.testTag("Streaming assistant text"),
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            // Only the tail past the last finalized block renders as
+                                            // plain text: parsing partial markdown (unclosed code
+                                            // fences, stray bold markers, half-built tables) garbles
+                                            // output, but blocks terminated by a blank line are
+                                            // complete and safe to render.
+                                            val stableLength = remember(renderedText) {
+                                                stableMarkdownPrefixLength(renderedText)
+                                            }
+                                            if (stableLength > 0) {
+                                                MarkdownMessage(
+                                                    renderedText.substring(0, stableLength),
+                                                    loadManagedImage = { path ->
+                                                        onLoadManagedImage(path).getOrThrow()
+                                                    },
+                                                    loadManagedVideo = onLoadManagedVideo,
+                                                    peekManagedVideo = onPeekManagedVideo,
+                                                )
+                                            }
+                                            val streamingTail = renderedText.substring(stableLength)
+                                            if (streamingTail.isNotEmpty()) {
+                                                Text(
+                                                    streamingTail,
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    modifier = Modifier.testTag("Streaming assistant text"),
+                                                )
+                                            }
                                         }
                                     }
                                     else -> {
