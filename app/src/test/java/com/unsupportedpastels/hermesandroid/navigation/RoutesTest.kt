@@ -94,5 +94,12 @@ class RoutesTest {
                 Json.encodeToString(SettingsAccountRoute.serializer(), SettingsAccountRoute),
             ),
         )
+        assertEquals(
+            SettingsReadingRoute,
+            Json.decodeFromString(
+                SettingsReadingRoute.serializer(),
+                Json.encodeToString(SettingsReadingRoute.serializer(), SettingsReadingRoute),
+            ),
+        )
     }
 }

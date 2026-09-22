@@ -24,6 +24,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.unsupportedpastels.hermesandroid.theme.LocalReadingProfile
+import com.unsupportedpastels.hermesandroid.theme.PaperBlack
+import com.unsupportedpastels.hermesandroid.ui.ReadingProfile
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.core.content.ContextCompat
@@ -100,7 +103,9 @@ private fun DeviceSpeechInputButtonForRequestScope(
         Icon(
             imageVector = if (active) Icons.Outlined.Stop else Icons.Outlined.Mic,
             contentDescription = null,
-            tint = if (active) {
+            tint = if (LocalReadingProfile.current == ReadingProfile.Paper) {
+                PaperBlack
+            } else if (active) {
                 MaterialTheme.colorScheme.primary
             } else if (available && enabled) {
                 MaterialTheme.colorScheme.onSurfaceVariant

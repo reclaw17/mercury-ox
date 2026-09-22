@@ -2946,9 +2946,13 @@ class HermesAppTest {
 
         composeRule.onNodeWithContentDescription("Settings").performClick()
         // Hub shows a concise list of sections, not the full form.
+        // Reading sits near the top; later rows may sit below the fold.
         composeRule.onNodeWithContentDescription("Open Servers settings").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Open Reading settings").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Open Default model settings").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Open Offline & privacy settings").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Open Offline & privacy settings")
+            .performScrollTo()
+            .assertIsDisplayed()
 
         composeRule.onNodeWithContentDescription("Open Default model settings").performClick()
         composeRule.onNodeWithText("Default model for new chats").assertIsDisplayed()
@@ -2957,7 +2961,7 @@ class HermesAppTest {
     }
 
     @Test
-    fun unauthenticatedSettingsHubOnlyOffersServers() {
+    fun unauthenticatedSettingsHubOffersServersAndReading() {
         composeRule.setContent {
             HermesAndroidTheme {
                 HermesApp(snapshot = HermesGatewaySnapshot(connectionState = ConnectionState.Connected))
@@ -2966,6 +2970,7 @@ class HermesAppTest {
 
         composeRule.onNodeWithContentDescription("Settings").performClick()
         composeRule.onNodeWithContentDescription("Open Servers settings").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Open Reading settings").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Open Default model settings").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Open Account settings").assertDoesNotExist()
     }

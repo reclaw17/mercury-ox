@@ -55,6 +55,9 @@ import com.unsupportedpastels.hermesandroid.share.parseIncomingShare
 import com.unsupportedpastels.hermesandroid.theme.HermesAndroidTheme
 import com.unsupportedpastels.hermesandroid.ui.HermesApp
 import com.unsupportedpastels.hermesandroid.ui.PaneLayoutPreferencesViewModel
+import com.unsupportedpastels.hermesandroid.ui.ReadingProfile
+import com.unsupportedpastels.hermesandroid.ui.ReadingProfilePreference
+import com.unsupportedpastels.hermesandroid.ui.ReadingProfileViewModel
 import com.unsupportedpastels.hermesandroid.ui.ProjectDockState
 import com.unsupportedpastels.hermesandroid.ui.ProjectIconAssignmentsState
 import com.unsupportedpastels.hermesandroid.ui.ProjectIconViewModel
@@ -81,6 +84,9 @@ class MainActivity : ComponentActivity() {
     private val paneLayoutPreferencesViewModel by viewModels<PaneLayoutPreferencesViewModel> {
         PaneLayoutPreferencesViewModel.Factory(this)
     }
+    private val readingProfileViewModel by viewModels<ReadingProfileViewModel> {
+        ReadingProfileViewModel.Factory(this)
+    }
     private val cloudViewModel by viewModels<com.unsupportedpastels.hermesandroid.connection.HermesCloudViewModel> {
         com.unsupportedpastels.hermesandroid.connection.HermesCloudViewModel.Factory(this)
     }
@@ -96,7 +102,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         window.isNavigationBarContrastEnforced = false
         setContent {
-            HermesAndroidTheme {
+            val readingProfile by readingProfileViewModel.profile.collectAsStateWithLifecycle()
+            HermesAndroidTheme(profile = readingProfile) {
                 val snapshot by connectionViewModel.snapshots.collectAsStateWithLifecycle()
                 NotificationPermissionEffect(snapshot) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -141,6 +148,7 @@ class MainActivity : ComponentActivity() {
                     cloudViewModel = cloudViewModel,
                     projectIconViewModel = projectIconViewModel,
                     paneLayoutPreferencesViewModel = paneLayoutPreferencesViewModel,
+                    readingProfileViewModel = readingProfileViewModel,
                     snapshot = snapshot,
                     relayState = relayState,
                     onRelayScan = {
@@ -280,6 +288,7 @@ internal fun HermesAppHost(
     cloudViewModel: com.unsupportedpastels.hermesandroid.connection.HermesCloudViewModel? = null,
     projectIconViewModel: ProjectIconViewModel? = null,
     paneLayoutPreferencesViewModel: PaneLayoutPreferencesViewModel? = null,
+    readingProfileViewModel: ReadingProfileViewModel? = null,
     snapshot: HermesGatewaySnapshot,
     relayState: RelayUiState = RelayUiState(),
     onRelayScan: () -> Unit = {},
@@ -381,6 +390,12 @@ internal fun HermesAppHost(
     val persistedProjectDockStateFlow = paneLayoutPreferencesViewModel?.projectDockState
         ?: remember { MutableStateFlow<ProjectDockState?>(null) }
     val persistedProjectDockState by persistedProjectDockStateFlow.collectAsStateWithLifecycle()
+    val readingPreferenceFlow = readingProfileViewModel?.preference
+        ?: remember { MutableStateFlow(ReadingProfilePreference.Auto) }
+    val readingPreference by readingPreferenceFlow.collectAsStateWithLifecycle()
+    val resolvedReadingProfileFlow = readingProfileViewModel?.profile
+        ?: remember { MutableStateFlow(ReadingProfile.Standard) }
+    val resolvedReadingProfile by resolvedReadingProfileFlow.collectAsStateWithLifecycle()
 
     val voiceCapabilitiesFlow = connectionViewModel?.voiceCapabilities
         ?: remember { MutableStateFlow(VoiceCapabilities.NONE) }
@@ -682,6 +697,11 @@ internal fun HermesAppHost(
         },
         onSlashCompletionRequested = { sessionId, text ->
             connectionViewModel?.updateSlashCompletion(sessionId, text)
+        },
+        readingPreference = readingPreference,
+        resolvedReadingProfile = resolvedReadingProfile,
+        onReadingPreferenceChange = { preference ->
+            readingProfileViewModel?.savePreference(preference)
         },
     )
 }

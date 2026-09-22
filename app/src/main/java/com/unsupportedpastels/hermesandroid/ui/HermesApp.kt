@@ -87,6 +87,7 @@ import com.unsupportedpastels.hermesandroid.navigation.SettingsVoiceRoute
 import com.unsupportedpastels.hermesandroid.navigation.SettingsOfflineRoute
 import com.unsupportedpastels.hermesandroid.navigation.SettingsJobsRoute
 import com.unsupportedpastels.hermesandroid.navigation.SettingsAccountRoute
+import com.unsupportedpastels.hermesandroid.navigation.SettingsReadingRoute
 import com.unsupportedpastels.hermesandroid.session.SavedSessionFilter
 import com.unsupportedpastels.hermesandroid.share.SharePayload
 import com.unsupportedpastels.hermesandroid.theme.HermesAndroidTheme
@@ -234,6 +235,9 @@ fun HermesApp(
     onSaveProjectIcon: suspend (ProjectId, ProjectIconId) -> Result<Unit> = { _, _ ->
         Result.success(Unit)
     },
+    readingPreference: ReadingProfilePreference = ReadingProfilePreference.Auto,
+    resolvedReadingProfile: ReadingProfile = ReadingProfile.Standard,
+    onReadingPreferenceChange: (ReadingProfilePreference) -> Unit = {},
 ) {
     val loadedProjectState = snapshot.projectState as? ProjectLoadState.Loaded
     val projects = loadedProjectState?.projects ?: snapshot.projects
@@ -491,6 +495,7 @@ fun HermesApp(
                 SettingsSection.Offline -> SettingsOfflineRoute
                 SettingsSection.Jobs -> SettingsJobsRoute
                 SettingsSection.Account -> SettingsAccountRoute
+                SettingsSection.Reading -> SettingsReadingRoute
             },
         )
         Unit
@@ -902,6 +907,7 @@ fun HermesApp(
                                 .distinct()
                                 .joinToString("\n")
                         },
+                        readingProfile = resolvedReadingProfile,
                     )
                 }
             }
@@ -914,7 +920,7 @@ fun HermesApp(
                 val available = if (authed) {
                     SettingsSection.entries.toSet()
                 } else {
-                    setOf(SettingsSection.Servers)
+                    setOf(SettingsSection.Servers, SettingsSection.Reading)
                 }
                 SettingsHubScreen(
                     availableSections = available,
@@ -945,6 +951,15 @@ fun HermesApp(
             }
             entry<SettingsAccountRoute>(metadata = ListDetailSceneStrategy.detailPane()) {
                 renderSettingsSection(SettingsSection.Account)
+            }
+            entry<SettingsReadingRoute>(metadata = ListDetailSceneStrategy.detailPane()) {
+                ReadingSettingsScreen(
+                    preference = readingPreference,
+                    resolvedProfile = resolvedReadingProfile,
+                    showBack = !supportsListDetail,
+                    onBack = navigateBack,
+                    onPreferenceChange = onReadingPreferenceChange,
+                )
             }
             },
                 )

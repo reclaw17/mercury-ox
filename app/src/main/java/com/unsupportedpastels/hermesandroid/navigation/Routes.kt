@@ -49,4 +49,7 @@ data object SettingsJobsRoute : NavKey
 data object SettingsAccountRoute : NavKey
 
 @Serializable
+data object SettingsReadingRoute : NavKey
+
+@Serializable
 data class SessionDetailRoute(val durableSessionId: DurableSessionId) : NavKey

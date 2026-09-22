@@ -10,13 +10,17 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.mutableLongStateOf
 import kotlinx.coroutines.delay
+import com.unsupportedpastels.hermesandroid.theme.LocalReadingProfile
 import com.unsupportedpastels.mercury.core.activity.ActivityLineInput
 import com.unsupportedpastels.mercury.core.activity.ActivityLinePolicy
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -135,6 +139,9 @@ import com.unsupportedpastels.hermesandroid.files.ManagedVideoMedia
 import com.unsupportedpastels.hermesandroid.files.HostFileContent
 import com.unsupportedpastels.hermesandroid.files.HostFileListing
 import com.unsupportedpastels.hermesandroid.theme.LocalHermesSemanticColors
+import com.unsupportedpastels.hermesandroid.theme.PaperBlack
+import com.unsupportedpastels.hermesandroid.theme.PaperButtonOutline
+import com.unsupportedpastels.hermesandroid.theme.PaperWhite
 import kotlinx.coroutines.launch
 import com.unsupportedpastels.mercury.core.composer.ComposerAction
 import com.unsupportedpastels.mercury.core.composer.ComposerRejection
@@ -227,6 +234,7 @@ internal fun SessionDetailScreen(
     onLoadHostFiles: suspend (String?) -> Result<HostFileListing>,
     onLoadManagedFile: suspend (String) -> Result<HostFileContent>,
     onAttachHostReference: (String) -> Unit,
+    readingProfile: ReadingProfile = ReadingProfile.Standard,
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -631,10 +639,20 @@ internal fun SessionDetailScreen(
                         // input) is at the tail: those own the bottom-end corner
                         // with their own action buttons, and the user is already at
                         // the bottom, so the FAB would only obstruct them.
+                        val paperReading = readingProfile == ReadingProfile.Paper ||
+                            LocalReadingProfile.current == ReadingProfile.Paper
                         androidx.compose.animation.AnimatedVisibility(
                             visible = !pinnedToBottom && !hasPendingTailInteraction(chat.runState),
-                            enter = fadeIn() + scaleIn(initialScale = 0.8f),
-                            exit = fadeOut() + scaleOut(targetScale = 0.8f),
+                            enter = if (paperReading) {
+                                androidx.compose.animation.EnterTransition.None
+                            } else {
+                                fadeIn() + scaleIn(initialScale = 0.8f)
+                            },
+                            exit = if (paperReading) {
+                                androidx.compose.animation.ExitTransition.None
+                            } else {
+                                fadeOut() + scaleOut(targetScale = 0.8f)
+                            },
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
                                 .padding(bottom = 8.dp),
@@ -652,7 +670,8 @@ internal fun SessionDetailScreen(
                                 shape = RoundedCornerShape(14.dp),
                                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                                 contentColor = MaterialTheme.colorScheme.onSurface,
-                                shadowElevation = 4.dp,
+                                border = if (paperReading) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
+                                shadowElevation = if (paperReading) 0.dp else 4.dp,
                                 modifier = Modifier
                                     .size(44.dp)
                                     .semantics { contentDescription = "Scroll to latest message" },
@@ -951,10 +970,27 @@ internal fun SessionDetailScreen(
                             )
                         }
                     }
+                    val paperComposer = readingProfile == ReadingProfile.Paper ||
+                        LocalReadingProfile.current == ReadingProfile.Paper
+                    val paperComposerColors = if (paperComposer) {
+                        IconButtonDefaults.filledIconButtonColors(
+                            containerColor = PaperWhite,
+                            contentColor = PaperBlack,
+                            disabledContainerColor = PaperWhite,
+                            disabledContentColor = PaperBlack,
+                        )
+                    } else {
+                        null
+                    }
+                    val paperComposerOutline = if (paperComposer) {
+                        Modifier.border(PaperButtonOutline, PaperBlack, CircleShape)
+                    } else {
+                        Modifier
+                    }
                     if (showStopControl) {
                         FilledIconButton(
                             enabled = !stopping,
-                            colors = IconButtonDefaults.filledIconButtonColors(
+                            colors = paperComposerColors ?: IconButtonDefaults.filledIconButtonColors(
                                 containerColor = semanticColors.active,
                                 contentColor = semanticColors.onActive,
                                 disabledContainerColor = semanticColors.active.copy(alpha = 0.38f),
@@ -963,6 +999,7 @@ internal fun SessionDetailScreen(
                             onClick = dropUnlessResumed { onStop() },
                             modifier = Modifier
                                 .size(40.dp)
+                                .then(paperComposerOutline)
                                 .semantics {
                                     contentDescription = "Stop Hermes response"
                                     stateDescription = if (stopping) "Stopping" else "Ready to stop"
@@ -1036,7 +1073,7 @@ internal fun SessionDetailScreen(
                             !stopping &&
                             canSubmitDuringActiveTurn &&
                             (draft.isNotBlank() || attachments.isNotEmpty()),
-                        colors = IconButtonDefaults.filledIconButtonColors(
+                        colors = paperComposerColors ?: IconButtonDefaults.filledIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary,
                             disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
@@ -1044,6 +1081,7 @@ internal fun SessionDetailScreen(
                         ),
                         modifier = Modifier
                             .size(40.dp)
+                            .then(paperComposerOutline)
                             .semantics {
                                 contentDescription = when (ComposerRoutingPolicy.route(
                                     draft, chat.isSending && controlledTurn,
