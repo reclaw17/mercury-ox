@@ -12,7 +12,7 @@ import com.unsupportedpastels.hermesandroid.gateway.ChatMessage
 import com.unsupportedpastels.hermesandroid.gateway.ChatMessageRole
 import kotlinx.coroutines.delay
 
-/** Paper transcript frames. Eight publishes per second, paragraph boundaries included. */
+/** Ordinary Paper transcript frames: at most eight per second. Paragraph and completion flushes are extra. */
 internal const val TranscriptUiMaxPublicationsPerSecond = 8
 
 /** Minimum gap between ordinary Paper publishes. Paragraph and completion flushes skip this. */
