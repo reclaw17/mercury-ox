@@ -31,6 +31,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -53,7 +54,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,6 +85,9 @@ import com.unsupportedpastels.hermesandroid.navigation.SettingsVoiceRoute
 import com.unsupportedpastels.hermesandroid.navigation.SettingsOfflineRoute
 import com.unsupportedpastels.hermesandroid.navigation.SettingsJobsRoute
 import com.unsupportedpastels.hermesandroid.navigation.SettingsAccountRoute
+import com.unsupportedpastels.hermesandroid.navigation.SettingsReadingRoute
+import com.unsupportedpastels.hermesandroid.theme.LocalReadingProfile
+import com.unsupportedpastels.hermesandroid.theme.PaperOutlinedButton
 import kotlinx.coroutines.launch
 /**
  * The distinct areas of the settings surface. Each maps to a hub row and a
@@ -90,6 +96,7 @@ import kotlinx.coroutines.launch
  */
 internal enum class SettingsSection(val title: String, val summary: String) {
     Servers("Servers", "Add, switch, or remove Hermes servers"),
+    Reading("Reading", "Auto, Standard, or Paper appearance"),
     Connection("Connection & profile", "Version, sign-in, and active profile"),
     Model("Default model", "Model and reasoning for new chats"),
     Voice("Voice", "Dictation and hands-free conversation"),
@@ -108,6 +115,7 @@ internal fun NavKey?.isSettingsRoute(): Boolean = when (this) {
     SettingsOfflineRoute,
     SettingsJobsRoute,
     SettingsAccountRoute,
+    SettingsReadingRoute,
     -> true
     else -> false
 }
@@ -116,7 +124,7 @@ internal fun NavKey?.isSettingsRoute(): Boolean = when (this) {
  * Settings landing: a compact list of sections instead of one giant scroll.
  * Each row navigates to its own section route; [availableSections] hides rows
  * (Connection/Model/Voice/Offline/Jobs/Account) that require an authenticated
- * connection.
+ * connection. Reading is local and stays available without a server.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -862,6 +870,97 @@ internal fun ServerSettingsScreen(
                 }) { Text("Set default") }
             },
             dismissButton = { TextButton(onClick = { pendingExpensive = null }) { Text("Cancel") } },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ReadingSettingsScreen(
+    preference: ReadingProfilePreference,
+    resolvedProfile: ReadingProfile,
+    showBack: Boolean,
+    onBack: () -> Unit,
+    onPreferenceChange: (ReadingProfilePreference) -> Unit,
+) {
+    Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing,
+        topBar = {
+            TopAppBar(
+                title = { Text("Reading") },
+                navigationIcon = {
+                    if (showBack) {
+                        TextButton(onClick = dropUnlessResumed { onBack() }) { Text("Back") }
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                "Auto uses Paper on a BOOX or Onyx device. Standard and Paper always use that appearance.",
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                "Using ${resolvedProfile.name}",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            ReadingProfilePreference.entries.forEach { option ->
+                ReadingPreferenceRow(
+                    option = option,
+                    selected = preference == option,
+                    onSelect = { onPreferenceChange(option) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReadingPreferenceRow(
+    option: ReadingProfilePreference,
+    selected: Boolean,
+    onSelect: () -> Unit,
+) {
+    val description = when (option) {
+        ReadingProfilePreference.Auto -> "Match this device"
+        ReadingProfilePreference.Standard -> "Phone, foldable, and pad colors"
+        ReadingProfilePreference.Paper -> "White page and black text"
+    }
+    val semantics = Modifier.semantics {
+        this.selected = selected
+        role = Role.RadioButton
+        contentDescription = "Reading ${option.name}"
+    }
+    if (LocalReadingProfile.current == ReadingProfile.Paper) {
+        PaperOutlinedButton(
+            onClick = onSelect,
+            selected = selected,
+            modifier = semantics.fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(option.name, style = MaterialTheme.typography.titleMedium)
+                Text(description, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    } else {
+        ListItem(
+            headlineContent = { Text(option.name) },
+            supportingContent = { Text(description) },
+            leadingContent = {
+                RadioButton(selected = selected, onClick = null)
+            },
+            modifier = semantics
+                .fillMaxWidth()
+                .clickable(onClick = onSelect),
         )
     }
 }

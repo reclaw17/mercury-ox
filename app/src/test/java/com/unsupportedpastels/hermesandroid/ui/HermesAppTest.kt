@@ -2957,7 +2957,7 @@ class HermesAppTest {
     }
 
     @Test
-    fun unauthenticatedSettingsHubOnlyOffersServers() {
+    fun unauthenticatedSettingsHubOffersServersAndReading() {
         composeRule.setContent {
             HermesAndroidTheme {
                 HermesApp(snapshot = HermesGatewaySnapshot(connectionState = ConnectionState.Connected))
@@ -2966,6 +2966,7 @@ class HermesAppTest {
 
         composeRule.onNodeWithContentDescription("Settings").performClick()
         composeRule.onNodeWithContentDescription("Open Servers settings").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Open Reading settings").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Open Default model settings").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Open Account settings").assertDoesNotExist()
     }

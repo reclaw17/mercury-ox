@@ -328,6 +328,84 @@ fun HermesCronJobsExpandedScreenshot() {
 }
 
 @PreviewTest
+@Preview(name = "Paper compact project home", widthDp = 400, heightDp = 900, showBackground = true)
+@Composable
+fun HermesPaperProjectHomeScreenshot() {
+    ScreenshotNavigationHost {
+        HermesAndroidTheme(darkTheme = false, profile = ReadingProfile.Paper) {
+            HermesApp(
+                snapshot = screenshotProjectSnapshot(),
+                serverSettingsState = screenshotServerSettings,
+                readingPreference = ReadingProfilePreference.Paper,
+                resolvedReadingProfile = ReadingProfile.Paper,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Paper expanded workspace", widthDp = 1200, heightDp = 900, showBackground = true)
+@Composable
+fun HermesPaperExpandedWorkspaceScreenshot() {
+    ScreenshotNavigationHost {
+        HermesAndroidTheme(darkTheme = false, profile = ReadingProfile.Paper) {
+            HermesApp(
+                snapshot = screenshotWorkspaceSnapshot(),
+                initialRoute = SessionDetailRoute(screenshotAlphaWorkspaceSession.id),
+                serverSettingsState = screenshotServerSettings,
+                readingPreference = ReadingProfilePreference.Paper,
+                resolvedReadingProfile = ReadingProfile.Paper,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(
+    name = "Paper compact large text",
+    widthDp = 400,
+    heightDp = 900,
+    fontScale = 1.5f,
+    showBackground = true,
+)
+@Composable
+fun HermesPaperCompactLargeTextScreenshot() {
+    ScreenshotNavigationHost {
+        HermesAndroidTheme(darkTheme = false, profile = ReadingProfile.Paper) {
+            HermesApp(
+                snapshot = screenshotProjectSnapshot(),
+                serverSettingsState = screenshotServerSettings,
+                readingPreference = ReadingProfilePreference.Paper,
+                resolvedReadingProfile = ReadingProfile.Paper,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(
+    name = "Paper expanded large text",
+    widthDp = 1200,
+    heightDp = 900,
+    fontScale = 1.5f,
+    showBackground = true,
+)
+@Composable
+fun HermesPaperExpandedLargeTextScreenshot() {
+    ScreenshotNavigationHost {
+        HermesAndroidTheme(darkTheme = false, profile = ReadingProfile.Paper) {
+            HermesApp(
+                snapshot = screenshotWorkspaceSnapshot(),
+                initialRoute = SessionDetailRoute(screenshotAlphaWorkspaceSession.id),
+                serverSettingsState = screenshotServerSettings,
+                readingPreference = ReadingProfilePreference.Paper,
+                resolvedReadingProfile = ReadingProfile.Paper,
+            )
+        }
+    }
+}
+
+@PreviewTest
 @Preview(name = "Compact project home light", widthDp = 400, heightDp = 900, showBackground = true)
 @Composable
 fun HermesProjectHomeScreenshot() {
