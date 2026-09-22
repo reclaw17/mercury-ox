@@ -10,7 +10,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.mutableLongStateOf
 import kotlinx.coroutines.delay
-import com.unsupportedpastels.hermesandroid.theme.LocalReadingProfile
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import com.unsupportedpastels.mercury.core.activity.ActivityLineInput
 import com.unsupportedpastels.mercury.core.activity.ActivityLinePolicy
 import androidx.compose.animation.fadeIn
@@ -242,6 +242,7 @@ internal fun SessionDetailScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val transcriptScope = rememberCoroutineScope()
+    val paperReading = paperSuppressesMotion(readingProfile)
     val readAloudSession = rememberReadAloudSession(readAloud, session.id.value)
     var showSessionInsights by remember(session.id) { mutableStateOf(false) }
     var showHostFiles by remember(session.id) { mutableStateOf(false) }
@@ -392,12 +393,17 @@ internal fun SessionDetailScreen(
         chat.messages.size,
         chat.messages.lastOrNull()?.text?.length,
         chat.runState,
+        paperReading,
     ) {
         if (chat.messages.isEmpty() && !hasRunStateContent) return@LaunchedEffect
         if (!followBottom) return@LaunchedEffect
         if (chat.messages.size != lastFollowedMessageCount) {
             lastFollowedMessageCount = chat.messages.size
-            transcriptListState.animateScrollToItem(timelineLastIndex, TranscriptEndScrollOffset)
+            if (paperReading) {
+                transcriptListState.scrollToItem(timelineLastIndex, TranscriptEndScrollOffset)
+            } else {
+                transcriptListState.animateScrollToItem(timelineLastIndex, TranscriptEndScrollOffset)
+            }
         } else {
             transcriptListState.scrollToItem(timelineLastIndex, TranscriptEndScrollOffset)
         }
@@ -639,8 +645,6 @@ internal fun SessionDetailScreen(
                         // input) is at the tail: those own the bottom-end corner
                         // with their own action buttons, and the user is already at
                         // the bottom, so the FAB would only obstruct them.
-                        val paperReading = readingProfile == ReadingProfile.Paper ||
-                            LocalReadingProfile.current == ReadingProfile.Paper
                         androidx.compose.animation.AnimatedVisibility(
                             visible = !pinnedToBottom && !hasPendingTailInteraction(chat.runState),
                             enter = if (paperReading) {
@@ -661,10 +665,17 @@ internal fun SessionDetailScreen(
                                 onClick = {
                                     followBottom = true
                                     transcriptScope.launch {
-                                        transcriptListState.animateScrollToItem(
-                                            timelineLastIndex,
-                                            TranscriptEndScrollOffset,
-                                        )
+                                        if (paperReading) {
+                                            transcriptListState.scrollToItem(
+                                                timelineLastIndex,
+                                                TranscriptEndScrollOffset,
+                                            )
+                                        } else {
+                                            transcriptListState.animateScrollToItem(
+                                                timelineLastIndex,
+                                                TranscriptEndScrollOffset,
+                                            )
+                                        }
                                     }
                                 },
                                 shape = RoundedCornerShape(14.dp),
@@ -848,7 +859,7 @@ internal fun SessionDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("Message composer")
-                    .animateContentSize(tween(150)),
+                    .then(if (paperReading) Modifier else Modifier.animateContentSize(tween(150))),
                 shape = RoundedCornerShape(30.dp),
                 color = MaterialTheme.colorScheme.surfaceContainer,
             ) {
@@ -970,8 +981,7 @@ internal fun SessionDetailScreen(
                             )
                         }
                     }
-                    val paperComposer = readingProfile == ReadingProfile.Paper ||
-                        LocalReadingProfile.current == ReadingProfile.Paper
+                    val paperComposer = paperReading
                     val paperComposerColors = if (paperComposer) {
                         IconButtonDefaults.filledIconButtonColors(
                             containerColor = PaperWhite,

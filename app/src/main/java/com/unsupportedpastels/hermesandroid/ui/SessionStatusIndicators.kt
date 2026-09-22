@@ -1,6 +1,8 @@
 package com.unsupportedpastels.hermesandroid.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -37,6 +40,7 @@ import com.unsupportedpastels.hermesandroid.app.RunToolRow
 import com.unsupportedpastels.hermesandroid.app.RunToolState
 import com.unsupportedpastels.hermesandroid.gateway.ChatSessionSnapshot
 import com.unsupportedpastels.hermesandroid.theme.LocalHermesSemanticColors
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 
 internal fun sessionContextPercent(chat: ChatSessionSnapshot): Double? {
     chat.sessionUsage?.let { usage ->
@@ -112,11 +116,19 @@ internal fun RunStatusPill(status: RunStatus) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(14.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.tertiary,
-            )
+            if (paperSuppressesMotion()) {
+                StaticWorkMark(
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+            } else {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(14.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
             Text(status.kind, style = MaterialTheme.typography.labelMedium)
             Text(
                 status.text,
@@ -158,13 +170,21 @@ internal fun RunToolRowContent(tool: RunToolRow) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         when (tool.state) {
-            RunToolState.Running -> CircularProgressIndicator(
-                modifier = Modifier
-                    .size(16.dp)
-                    .semantics { contentDescription = "Running" },
-                color = semanticColors.active,
-                strokeWidth = 2.dp,
-            )
+            RunToolState.Running -> if (paperSuppressesMotion()) {
+                StaticWorkMark(
+                    contentDescription = "Running",
+                    modifier = Modifier.size(16.dp),
+                    color = semanticColors.active,
+                )
+            } else {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(16.dp)
+                        .semantics { contentDescription = "Running" },
+                    color = semanticColors.active,
+                    strokeWidth = 2.dp,
+                )
+            }
             RunToolState.Completed -> Icon(
                 Icons.Outlined.Check,
                 contentDescription = null,
@@ -207,4 +227,23 @@ internal fun RunToolRowContent(tool: RunToolRow) {
             )
         }
     }
+}
+
+@Composable
+internal fun StaticWorkMark(
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary,
+) {
+    Box(
+        modifier
+            .background(color, CircleShape)
+            .then(
+                if (contentDescription != null) {
+                    Modifier.semantics { this.contentDescription = contentDescription }
+                } else {
+                    Modifier
+                },
+            ),
+    )
 }

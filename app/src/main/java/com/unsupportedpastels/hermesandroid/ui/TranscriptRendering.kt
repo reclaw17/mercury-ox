@@ -49,6 +49,7 @@ import com.unsupportedpastels.hermesandroid.gateway.ChatMessage
 import com.unsupportedpastels.hermesandroid.gateway.ChatSessionSnapshot
 import com.unsupportedpastels.hermesandroid.files.ManagedVideoMedia
 import com.unsupportedpastels.hermesandroid.theme.LocalHermesSemanticColors
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import com.unsupportedpastels.mercury.core.transcript.TranscriptPresentationPolicy
 
 /** Native identities and payloads retained around the shared turn policy. */
@@ -339,11 +340,19 @@ internal fun ToolActivityGroup(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (anyRunning) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color = semanticColors.active,
-                    )
+                    if (paperSuppressesMotion()) {
+                        StaticWorkMark(
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            color = semanticColors.active,
+                        )
+                    } else {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = semanticColors.active,
+                        )
+                    }
                 } else {
                     Icon(
                         Icons.Outlined.Check,

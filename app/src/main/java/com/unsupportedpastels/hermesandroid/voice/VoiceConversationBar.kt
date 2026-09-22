@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.unsupportedpastels.hermesandroid.gateway.ChatSessionSnapshot
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -470,7 +471,12 @@ fun VoiceConversationBar(
         }
     }
     val level = (state as? VoiceConversationState.Listening)?.level ?: 0f
-    val pulse by animateFloatAsState(targetValue = 1f + level * 0.6f, label = "voiceLevelPulse")
+    val pulse = if (paperSuppressesMotion()) {
+        1f
+    } else {
+        val animated by animateFloatAsState(targetValue = 1f + level * 0.6f, label = "voiceLevelPulse")
+        animated
+    }
 
     Surface(
         modifier = modifier

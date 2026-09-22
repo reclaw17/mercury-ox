@@ -40,8 +40,9 @@ import kotlinx.coroutines.launch
 internal val LocalReadingProfile = staticCompositionLocalOf { ReadingProfile.Standard }
 
 /**
- * Focus draws a 2 dp black ring. Press does not ripple or fade; button chrome
- * owns the black/white swap.
+ * Focus draws a 2 dp black ring and nothing else. Press does not ripple, fade,
+ * or scale. This is the Paper [LocalIndication]: ripple configuration is null,
+ * and there is no animated indication. Button chrome owns the black/white swap.
  */
 internal object PaperFocusIndication : IndicationNodeFactory {
     override fun create(interactionSource: InteractionSource): DelegatableNode =
