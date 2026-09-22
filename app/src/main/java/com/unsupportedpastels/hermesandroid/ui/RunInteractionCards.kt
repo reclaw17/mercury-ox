@@ -1,5 +1,6 @@
 package com.unsupportedpastels.hermesandroid.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,6 +48,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.dropUnlessResumed
 import com.unsupportedpastels.hermesandroid.app.ApprovalInteraction
+import com.unsupportedpastels.hermesandroid.theme.LocalReadingProfile
+import com.unsupportedpastels.hermesandroid.theme.readingFrameBorder
+import com.unsupportedpastels.hermesandroid.theme.readingPaneColor
 import com.unsupportedpastels.hermesandroid.app.ClarificationInteraction
 import com.unsupportedpastels.hermesandroid.app.RunInteractionLifecycle
 import com.unsupportedpastels.hermesandroid.app.UnsupportedBlockingInteraction
@@ -73,7 +77,8 @@ internal fun ThinkingBlock(
     Surface(
         onClick = onToggle,
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = readingPaneColor(MaterialTheme.colorScheme.surfaceContainerLow),
+        border = readingFrameBorder(),
         modifier = Modifier
             .fillMaxWidth()
             .semantics {
@@ -188,18 +193,24 @@ internal fun ClarificationCard(
                         ) {
                             choices.forEach { choice ->
                                 val chosen = choice in clarifyState.selectedChoices
+                                val paper = LocalReadingProfile.current == ReadingProfile.Paper
                                 Surface(
                                     onClick = { clarifyState = clarifyState.select(choice) },
                                     shape = RoundedCornerShape(12.dp),
-                                    color = if (chosen) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.secondaryContainer
+                                    color = when {
+                                        chosen -> MaterialTheme.colorScheme.primary
+                                        paper -> MaterialTheme.colorScheme.surface
+                                        else -> MaterialTheme.colorScheme.secondaryContainer
                                     },
-                                    contentColor = if (chosen) {
-                                        MaterialTheme.colorScheme.onPrimary
+                                    contentColor = when {
+                                        chosen -> MaterialTheme.colorScheme.onPrimary
+                                        paper -> MaterialTheme.colorScheme.onSurface
+                                        else -> MaterialTheme.colorScheme.onSecondaryContainer
+                                    },
+                                    border = if (paper) {
+                                        BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                                     } else {
-                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                        null
                                     },
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
@@ -281,19 +292,34 @@ internal fun ApprovalCard(
     interaction: ApprovalInteraction,
     onResponse: (String, Boolean) -> Unit,
 ) {
+    val paper = LocalReadingProfile.current == ReadingProfile.Paper
+    val pending = interaction.lifecycle == RunInteractionLifecycle.Pending
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (interaction.lifecycle == RunInteractionLifecycle.Pending) {
-                MaterialTheme.colorScheme.tertiaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceContainer
-            },
-            contentColor = if (interaction.lifecycle == RunInteractionLifecycle.Pending) {
-                MaterialTheme.colorScheme.onTertiaryContainer
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-        ),
+        colors = if (paper) {
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            )
+        } else {
+            CardDefaults.cardColors(
+                containerColor = if (pending) {
+                    MaterialTheme.colorScheme.tertiaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainer
+                },
+                contentColor = if (pending) {
+                    MaterialTheme.colorScheme.onTertiaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
+        },
+        border = readingFrameBorder(),
+        elevation = if (paper) {
+            CardDefaults.cardElevation(defaultElevation = 0.dp)
+        } else {
+            CardDefaults.cardElevation()
+        },
         modifier = Modifier
             .fillMaxWidth()
             .semantics {
@@ -321,8 +347,17 @@ internal fun ApprovalCard(
             interaction.commandPreview?.takeIf(String::isNotBlank)?.let { command ->
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (paper) {
+                        MaterialTheme.colorScheme.surface
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    },
+                    contentColor = if (paper) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    border = if (paper) readingFrameBorder() else null,
                     modifier = Modifier
                         .fillMaxWidth()
                         .semantics { contentDescription = "Command preview: $command" },

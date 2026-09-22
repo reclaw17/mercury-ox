@@ -93,6 +93,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -575,8 +576,21 @@ internal fun SessionDetailScreen(
                                                     bottomEnd = 4.dp,
                                                     bottomStart = 18.dp,
                                                 ),
-                                                color = MaterialTheme.colorScheme.secondaryContainer,
-                                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                color = if (paperReading) {
+                                                    Color.Transparent
+                                                } else {
+                                                    MaterialTheme.colorScheme.secondaryContainer
+                                                },
+                                                contentColor = if (paperReading) {
+                                                    MaterialTheme.colorScheme.onSurface
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                                },
+                                                border = if (paperReading) {
+                                                    BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                                                } else {
+                                                    null
+                                                },
                                                 modifier = Modifier
                                                     .padding(start = 48.dp)
                                                     .width(IntrinsicSize.Max),
@@ -604,6 +618,7 @@ internal fun SessionDetailScreen(
                                             if (segments.isEmpty() && streamingTail.isEmpty()) {
                                                 Text(
                                                     "…",
+                                                    color = MaterialTheme.colorScheme.onSurface,
                                                     style = MaterialTheme.typography.bodyLarge,
                                                     modifier = Modifier.testTag("Streaming assistant text"),
                                                 )
@@ -623,6 +638,7 @@ internal fun SessionDetailScreen(
                                                 if (streamingTail.isNotEmpty()) {
                                                     Text(
                                                         streamingTail,
+                                                        color = MaterialTheme.colorScheme.onSurface,
                                                         style = MaterialTheme.typography.bodyLarge,
                                                         modifier = Modifier.testTag("Streaming assistant text"),
                                                     )
@@ -704,7 +720,8 @@ internal fun SessionDetailScreen(
                                 .align(Alignment.BottomEnd)
                                 .padding(bottom = 8.dp),
                         ) {
-                            Surface(
+                            TranscriptJumpControl(
+                                paper = paperReading,
                                 onClick = {
                                     followBottom = true
                                     transcriptScope.launch {
@@ -721,23 +738,7 @@ internal fun SessionDetailScreen(
                                         }
                                     }
                                 },
-                                shape = RoundedCornerShape(14.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                contentColor = MaterialTheme.colorScheme.onSurface,
-                                border = if (paperReading) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
-                                shadowElevation = if (paperReading) 0.dp else 4.dp,
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .semantics { contentDescription = "Scroll to latest message" },
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Outlined.ArrowDownward,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(22.dp),
-                                    )
-                                }
-                            }
+                            )
                         }
                     }
                 }
@@ -904,7 +905,16 @@ internal fun SessionDetailScreen(
                     .testTag("Message composer")
                     .then(if (paperReading) Modifier else Modifier.animateContentSize(tween(150))),
                 shape = RoundedCornerShape(30.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
+                color = if (paperReading) {
+                    MaterialTheme.colorScheme.surface
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainer
+                },
+                border = if (paperReading) {
+                    BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                } else {
+                    null
+                },
             ) {
                 Column {
                 ComposerActivityLine(line, chat.progress.turnStartedAtEpochMillis, { showActivity = true })
@@ -1368,6 +1378,37 @@ internal fun SessionDetailScreen(
             onPeekManagedVideo = onPeekManagedVideo,
             onLoadManagedFile = onLoadManagedFile,
         )
+    }
+}
+
+@Composable
+internal fun TranscriptJumpControl(
+    paper: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = if (paper) {
+            MaterialTheme.colorScheme.surface
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        },
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = if (paper) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
+        shadowElevation = if (paper) 0.dp else 4.dp,
+        modifier = modifier
+            .size(if (paper) 48.dp else 44.dp)
+            .semantics { contentDescription = "Scroll to latest message" },
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                Icons.Outlined.ArrowDownward,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+            )
+        }
     }
 }
 

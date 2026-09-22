@@ -18,6 +18,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.runtime.Composable
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,7 +83,9 @@ internal fun HermesCloudConnectPanel(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    if (!paperSuppressesMotion()) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    }
                     Column {
                         Text(
                             "Finish signing in in your browser.",
@@ -103,7 +106,9 @@ internal fun HermesCloudConnectPanel(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    if (!paperSuppressesMotion()) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    }
                     Text("Loading your agents…", style = MaterialTheme.typography.bodyMedium)
                 }
             }

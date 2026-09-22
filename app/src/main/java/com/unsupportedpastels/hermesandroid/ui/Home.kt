@@ -840,9 +840,11 @@ internal fun SessionListScreen(
 @Composable
 internal fun WorkingIndicator(modifier: Modifier = Modifier) {
     if (paperSuppressesMotion()) {
-        StaticWorkMark(
-            contentDescription = "Agent is working",
-            modifier = modifier.size(14.dp),
+        Text(
+            "Agent is working",
+            modifier = modifier.semantics { contentDescription = "Agent is working" },
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
         )
     } else {
         CircularProgressIndicator(

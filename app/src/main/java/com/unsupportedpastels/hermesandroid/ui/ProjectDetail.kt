@@ -25,7 +25,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -59,6 +58,7 @@ import com.unsupportedpastels.hermesandroid.app.ProjectSummary
 import com.unsupportedpastels.hermesandroid.app.SessionSummary
 import com.unsupportedpastels.hermesandroid.app.validProjectWorkspacePath
 import com.unsupportedpastels.hermesandroid.theme.LocalHermesSemanticColors
+import com.unsupportedpastels.hermesandroid.theme.ReadingPaneDivider
 import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -162,7 +162,7 @@ internal fun ProjectDetailScreen(
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            HorizontalDivider()
+            ReadingPaneDivider()
             when (state) {
                 null,
                 ProjectSessionLoadState.Loading,
@@ -239,7 +239,7 @@ internal fun ProjectDetailScreen(
                                         )
                                     }
                                 }
-                                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                                ReadingPaneDivider(modifier = Modifier.padding(horizontal = 16.dp))
                             }
                         }
                     }
@@ -306,9 +306,12 @@ internal fun SessionInboxRow(
         ) {
             when {
                 isWorking -> if (paperSuppressesMotion()) {
-                    StaticWorkMark(
-                        contentDescription = "${session.title} is running",
-                        modifier = Modifier.size(10.dp),
+                    Text(
+                        "Running",
+                        modifier = Modifier.semantics {
+                            contentDescription = "${session.title} is running"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
                         color = activeColor,
                     )
                 } else {

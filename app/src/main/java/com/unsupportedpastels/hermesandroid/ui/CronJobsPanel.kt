@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import com.unsupportedpastels.hermesandroid.gateway.CronJob
 import com.unsupportedpastels.hermesandroid.gateway.CronJobAction
 import com.unsupportedpastels.hermesandroid.gateway.CronJobRun
@@ -90,9 +91,11 @@ fun CronJobsPanel(
                 Text("No cron jobs loaded yet.")
 
             CronJobsState.Loading -> {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                )
+                if (!paperSuppressesMotion()) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
+                }
                 Text("Loading cron jobs")
             }
 
@@ -222,7 +225,9 @@ private fun CronJobCard(
                 }
                 when (runsState) {
                     CronJobRunsState.Loading -> {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                        if (!paperSuppressesMotion()) {
+                            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                        }
                         Text("Loading runs")
                     }
                     is CronJobRunsState.Ready -> CronRunDetails(runsState.runs, job)
