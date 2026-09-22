@@ -23,6 +23,10 @@ import kotlinx.coroutines.sync.withLock
  *
  * Basic auth is deliberately cookie-backed: passwords never enter this class,
  * and HttpOnly session cookies are the only durable credential material kept.
+ *
+ * Jar keys follow [cookieJarOriginKey] so they match [ServerOrigin.value]
+ * (default ports elided). Older installs that keyed `scheme://host:443` are
+ * migrated on read.
  */
 class EncryptedHermesCookieStorage(
     context: Context,
@@ -39,7 +43,7 @@ class EncryptedHermesCookieStorage(
     private val cookies = mutableMapOf<String, MutableMap<String, String>>()
 
     override suspend fun get(url: Url): List<Cookie> = mutex.withLock {
-        val origin = originKey(url)
+        val origin = cookieJarOriginKey(url)
         loadLocked(origin)
         // Replay stored values verbatim. Hermes session cookies are base64
         // (RFC 4648) tokens containing '=', '/', and '+'; the server sets them
@@ -54,7 +58,7 @@ class EncryptedHermesCookieStorage(
     }
 
     override suspend fun addCookie(url: Url, cookie: Cookie) = mutex.withLock {
-        val origin = originKey(url)
+        val origin = cookieJarOriginKey(url)
         loadLocked(origin)
         val bucket = cookies.getOrPut(origin) { mutableMapOf() }
         if (cookie.value.isEmpty()) {
@@ -65,20 +69,63 @@ class EncryptedHermesCookieStorage(
         persistLocked(origin, bucket)
     }
 
+    /**
+     * Origin key + cookie **names** only. Safe for device proof logs; never
+     * returns cookie values, tokens, or Authorization material.
+     */
+    suspend fun diagnostics(url: Url): HermesCookieJarDiagnostics = mutex.withLock {
+        val origin = cookieJarOriginKey(url)
+        loadLocked(origin)
+        HermesCookieJarDiagnostics(
+            originKey = origin,
+            cookieNames = cookies[origin].orEmpty().keys.sorted(),
+        )
+    }
+
     override fun close() = Unit
+
+    /**
+     * Test helper: write cookies under an explicit jar key (including legacy
+     * `https://host:443` keys) and drop the in-memory cache so the next
+     * [get]/[addCookie]/[diagnostics] reloads and migrates.
+     */
+    internal suspend fun seedRawForTest(originKey: String, values: Map<String, String>) =
+        mutex.withLock {
+            persistLocked(originKey, values)
+            loaded.clear()
+            cookies.clear()
+        }
 
     private fun loadLocked(origin: String) {
         if (!loaded.add(origin)) return
-        val encoded = preferences.getString(preferenceKey(origin), null) ?: return
-        val decoded = runCatching {
+        decodePersisted(origin)?.let { decoded ->
+            cookies[origin] = decoded.toMutableMap()
+            return
+        }
+        for (legacy in legacyCookieJarOriginKeys(origin)) {
+            val migrated = decodePersisted(legacy) ?: continue
+            cookies[origin] = migrated.toMutableMap()
+            persistLocked(origin, migrated)
+            @Suppress("UseKtx")
+            preferences.edit().remove(preferenceKey(legacy)).commit()
+            return
+        }
+        cookies[origin] = mutableMapOf()
+    }
+
+    private fun decodePersisted(origin: String): Map<String, String>? {
+        val encoded = preferences.getString(preferenceKey(origin), null) ?: return null
+        return runCatching {
             val ciphertext = Base64.decode(encoded, Base64.DEFAULT)
-            if (ciphertext.size > MAX_CIPHERTEXT_BYTES) return@runCatching emptyMap<String, String>()
-            val plaintext = aead.decrypt(ciphertext, origin.toByteArray(StandardCharsets.UTF_8))
-            if (plaintext.size > MAX_PLAINTEXT_BYTES) return@runCatching emptyMap<String, String>()
+            if (ciphertext.size > MAX_CIPHERTEXT_BYTES) return@runCatching null
+            val plaintext = aead.decrypt(
+                ciphertext,
+                origin.toByteArray(StandardCharsets.UTF_8),
+            )
+            if (plaintext.size > MAX_PLAINTEXT_BYTES) return@runCatching null
             json.decodeFromString<List<CookieRecord>>(plaintext.toString(StandardCharsets.UTF_8))
                 .associate { it.name to it.value }
-        }.getOrDefault(emptyMap())
-        cookies[origin] = decoded.toMutableMap()
+        }.getOrNull()
     }
 
     @Suppress("UseKtx")
@@ -97,9 +144,6 @@ class EncryptedHermesCookieStorage(
     }
 
     private fun preferenceKey(origin: String): String = "cookie_" + sha256(origin).toHex()
-
-    private fun originKey(url: Url): String =
-        "${url.protocol.name}://${url.host}:${url.port}"
 
     @Serializable
     private data class CookieRecord(val name: String, val value: String)
