@@ -599,6 +599,109 @@ class HermesConnectionViewModelTest {
     }
 
     @Test
+    fun passwordSignInPersistsCookiePlaceholderForNonBasicProviderAndClearsStaleBearer() =
+        runTest(dispatcher) {
+            val origin = ServerOrigin.parse("https://hermes.example")
+            val settings = MutableStateFlow<ServerSettingsState>(ServerSettingsState.Ready(origin))
+            val client = AuthenticatingHermesConnectionClient()
+            val passwordLogin = FakePasswordLogin()
+            val tokenStore = RecordingTokenStore()
+            val viewModel = HermesConnectionViewModel(
+                settingsStates = settings,
+                client = client,
+                passwordLogin = passwordLogin,
+                tokenStore = tokenStore,
+            )
+            runCurrent()
+            client.probeResponse.complete(
+                HermesConnectionInfo(
+                    version = "0.20.0",
+                    authRequired = true,
+                    nativeOAuthSupported = false,
+                    providers = listOf(
+                        HermesAuthProvider("local", "Username & Password", supportsPassword = true),
+                    ),
+                ),
+            )
+            advanceUntilIdle()
+            assertEquals(AuthenticationState.SignInRequired, viewModel.snapshots.value.authenticationState)
+
+            // Seed a stale OAuth bearer after the probe so password sign-in must
+            // clear it before cookie validation (Hermes prefers Authorization).
+            tokenStore.seed(
+                NativeTokenSet(
+                    accessToken = "stale-oauth",
+                    refreshToken = "stale-refresh",
+                    expiresAt = 2_000_000_000,
+                    provider = "nous",
+                    userId = "oauth-user",
+                ),
+            )
+
+            viewModel.signInWithPassword("admin", "fixture-password")
+            runCurrent()
+            assertEquals(AuthenticationState.SigningIn, viewModel.snapshots.value.authenticationState)
+            passwordLogin.response.complete(
+                cookieBackedSessionTokens(provider = "local", userId = "admin"),
+            )
+            client.authenticationResponse.complete(
+                AuthenticatedHermesConnection(
+                    userId = "admin",
+                    sessions = listOf(SessionSummary(DurableSessionId("s1"), "Session")),
+                ),
+            )
+            advanceUntilIdle()
+
+            val snapshot = viewModel.snapshots.value
+            assertEquals(AuthenticationState.Authenticated, snapshot.authenticationState)
+            assertEquals("", client.authenticatedWith)
+            assertTrue(tokenStore.clearCalls >= 1)
+            val saved = checkNotNull(tokenStore.saved)
+            assertEquals("local", saved.provider)
+            assertEquals("admin", saved.userId)
+            assertEquals("", saved.accessToken)
+            assertEquals(0L, saved.expiresAt)
+            assertEquals(listOf("Session"), snapshot.durableSessions.map { it.title })
+            assertEquals(listOf(Triple("local", "admin", "fixture-password")), passwordLogin.requests)
+        }
+
+    @Test
+    fun cookiePlaceholderReconnectsWithoutSignInRequired() = runTest(dispatcher) {
+        val origin = ServerOrigin.parse("https://hermes.example")
+        val settings = MutableStateFlow<ServerSettingsState>(ServerSettingsState.Ready(origin))
+        val client = AuthenticatingHermesConnectionClient()
+        val tokenStore = RecordingTokenStore(
+            initial = cookieBackedSessionTokens(provider = "local", userId = "admin"),
+        )
+        val viewModel = HermesConnectionViewModel(
+            settingsStates = settings,
+            client = client,
+            tokenStore = tokenStore,
+        )
+        runCurrent()
+        client.probeResponse.complete(
+            HermesConnectionInfo(
+                version = "0.20.0",
+                authRequired = true,
+                nativeOAuthSupported = false,
+                providers = listOf(
+                    HermesAuthProvider("local", "Username & Password", supportsPassword = true),
+                ),
+            ),
+        )
+        client.authenticationResponse.complete(
+            AuthenticatedHermesConnection(
+                userId = "admin",
+                sessions = listOf(SessionSummary(DurableSessionId("s1"), "Session")),
+            ),
+        )
+        advanceUntilIdle()
+
+        assertEquals(AuthenticationState.Authenticated, viewModel.snapshots.value.authenticationState)
+        assertEquals("", client.authenticatedWith)
+    }
+
+    @Test
     fun serverProbeAndSavedTokenLoadRunConcurrently() = runTest(dispatcher) {
         val probeStarted = CompletableDeferred<Unit>()
         val tokenLoadStarted = CompletableDeferred<Unit>()
@@ -4124,6 +4227,49 @@ private class FakeNativeLogin : NativeLogin {
         provider: String,
         openBrowser: suspend (String) -> Unit,
     ): NativeTokenSet = response.await()
+}
+
+private class FakePasswordLogin : NativePasswordLogin {
+    val response = CompletableDeferred<NativeTokenSet>()
+    val requests = mutableListOf<Triple<String, String, String>>()
+
+    override suspend fun signIn(
+        serverOrigin: ServerOrigin,
+        provider: String,
+        username: String,
+        password: String,
+    ): NativeTokenSet {
+        requests += Triple(provider, username, password)
+        return response.await()
+    }
+}
+
+private class RecordingTokenStore(
+    initial: NativeTokenSet? = null,
+) : NativeTokenStore {
+    private var value = initial
+    var saved: NativeTokenSet? = null
+        private set
+    var clearCalls = 0
+        private set
+
+    fun seed(tokens: NativeTokenSet?) {
+        value = tokens
+        saved = tokens
+    }
+
+    override suspend fun load(serverOrigin: ServerOrigin): NativeTokenSet? = value
+
+    override suspend fun save(serverOrigin: ServerOrigin, tokens: NativeTokenSet) {
+        saved = tokens
+        value = tokens
+    }
+
+    override suspend fun clear(serverOrigin: ServerOrigin) {
+        clearCalls += 1
+        value = null
+        saved = null
+    }
 }
 
 private class SwitchingHermesConnectionClient : HermesConnectionClient {

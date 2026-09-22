@@ -281,12 +281,23 @@ class HttpHermesPasswordAuthClient(
                 "Hermes password sign-in returned HTTP ${response.status.value}",
             )
         }
-        // Basic auth is cookie-backed. The shared Ktor client captures the
-        // HttpOnly session cookies; an empty access token deliberately prevents
-        // the REST layer from adding a bogus Bearer header.
-        return NativeTokenSet(accessToken = "", provider = provider, userId = boundedUsername, expiresAt = 0)
+        // Password auth is cookie-backed for any supports_password provider.
+        // The shared Ktor client captures the HttpOnly session cookies; an
+        // empty access token deliberately prevents the REST layer from adding
+        // a bogus Bearer header. expiresAt stays 0 so refresh is skipped.
+        return cookieBackedSessionTokens(provider = provider, userId = boundedUsername)
     }
 }
+
+/** Placeholder persisted after cookie-backed password login (no JWT Bearer). */
+internal fun cookieBackedSessionTokens(provider: String, userId: String): NativeTokenSet =
+    NativeTokenSet(
+        accessToken = "",
+        refreshToken = "",
+        expiresAt = 0,
+        provider = provider,
+        userId = userId,
+    )
 
 interface NativeLogin {
     suspend fun signIn(

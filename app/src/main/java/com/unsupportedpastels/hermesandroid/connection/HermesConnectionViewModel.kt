@@ -2690,6 +2690,11 @@ class HermesConnectionViewModel(
                 val tokens = login.signIn(serverOrigin, provider.name, username, password)
                 currentCoroutineContext().ensureActive()
                 if (generation != currentGeneration || activeOrigin != serverOrigin) return@launch
+                // Hermes middleware prefers Authorization over cookies. Clear any
+                // stale OAuth bearer before validating the fresh password cookie
+                // (iOS ConnectionController.startPasswordSignIn parity).
+                tokenStore?.clear(serverOrigin)
+                activeTokens = null
                 val authenticated = client.authenticate(serverOrigin, tokens.accessToken)
                 currentCoroutineContext().ensureActive()
                 if (generation != currentGeneration || activeOrigin != serverOrigin) return@launch

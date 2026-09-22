@@ -151,6 +151,66 @@ class NativeTokenStoreTest {
         assertNull(store.load(origin))
     }
 
+    @Test
+    fun cookieBackedPasswordPlaceholderPersistsForNonBasicProvider() = runTest {
+        // Hermes advertises arbitrary supports_password names (e.g. "local").
+        // A blank access token + expiresAt=0 is the cookie-session marker; requiring
+        // provider == "basic" previously threw after login_success and left the UI
+        // on Sign in required despite a live HttpOnly cookie jar.
+        val store = EncryptedNativeTokenStore(context, preferencesName)
+        val tokens = cookieBackedSessionTokens(provider = "local", userId = "admin")
+
+        store.save(origin, tokens)
+
+        assertEquals(tokens, store.load(origin))
+        assertTrue(store.load(origin)!!.accessToken.isEmpty())
+        assertEquals(0L, store.load(origin)!!.expiresAt)
+    }
+
+    @Test
+    fun cookieBackedPasswordPlaceholderPersistsForBasicProvider() = runTest {
+        val store = EncryptedNativeTokenStore(context, preferencesName)
+        val tokens = cookieBackedSessionTokens(provider = "basic", userId = "admin")
+
+        store.save(origin, tokens)
+
+        assertEquals(tokens, store.load(origin))
+    }
+
+    @Test
+    fun blankAccessTokenWithPositiveExpiryIsRejected() = runTest {
+        val store = EncryptedNativeTokenStore(context, preferencesName)
+        val incomplete = NativeTokenSet(
+            accessToken = "",
+            refreshToken = "",
+            expiresAt = 2_000_000_000,
+            provider = "local",
+            userId = "admin",
+        )
+
+        val failure = runCatching { store.save(origin, incomplete) }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+        assertNull(store.load(origin))
+    }
+
+    @Test
+    fun nonBlankAccessTokenStillRequiresPositiveExpiry() = runTest {
+        val store = EncryptedNativeTokenStore(context, preferencesName)
+        val incomplete = NativeTokenSet(
+            accessToken = "opaque-access",
+            refreshToken = "opaque-refresh",
+            expiresAt = 0,
+            provider = "nous",
+            userId = "user-1",
+        )
+
+        val failure = runCatching { store.save(origin, incomplete) }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+        assertNull(store.load(origin))
+    }
+
     private fun tokenSet(accessToken: String, refreshToken: String) = NativeTokenSet(
         accessToken = accessToken,
         refreshToken = refreshToken,

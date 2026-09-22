@@ -92,9 +92,15 @@ class EncryptedNativeTokenStore(
     private fun validate(tokens: NativeTokenSet) {
         require(tokens.provider.isNotBlank()) { "Native token response was incomplete" }
         require(tokens.userId.isNotBlank()) { "Native token response was incomplete" }
-        if (tokens.provider != "basic") {
-            require(tokens.accessToken.isNotBlank()) { "Native token response was incomplete" }
-            require(tokens.expiresAt > 0) { "Native token response was incomplete" }
+        if (tokens.accessToken.isBlank()) {
+            // Cookie-backed password sessions intentionally store a blank access
+            // token so REST/WS never send a bogus Bearer. Hermes may advertise
+            // any supports_password provider name ("basic", "local", …) — do not
+            // require provider == "basic" or a successful login_success path
+            // fails closed after /api/auth/me and the UI sticks on Sign in required.
+            require(tokens.expiresAt == 0L) { "Native token response was incomplete" }
+        } else {
+            require(tokens.expiresAt > 0L) { "Native token response was incomplete" }
         }
         requireTokenSize(tokens.accessToken)
         requireTokenSize(tokens.refreshToken)
