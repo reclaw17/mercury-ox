@@ -7241,6 +7241,11 @@ class HermesConnectionViewModel(
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(HermesConnectionViewModel::class.java))
+            // One HttpClient for password-login, REST (/api/auth/me), and
+            // WS-ticket minting so the EncryptedHermesCookieStorage jar is
+            // shared. Cookie-backed password sessions store a blank access
+            // token; without this shared jar, hermesAuth()/mintTicket send no
+            // Bearer and no Cookie → 401 → SignInRequired after login_success.
             val httpClient = HttpClient(CIO) {
                 configureHermesHttpClient()
                 install(HttpCookies) {
