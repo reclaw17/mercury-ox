@@ -9,6 +9,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
+import com.unsupportedpastels.hermesandroid.ui.ReadingProfile
 
 @Immutable
 data class HermesSemanticColors(
@@ -28,7 +29,7 @@ val LocalHermesSemanticColors = staticCompositionLocalOf {
     )
 }
 
-private val LightColors = lightColorScheme(
+internal val LightColors = lightColorScheme(
     primary = Color(0xFF1B6969),
     onPrimary = Color(0xFFE0FFFE),
     primaryContainer = Color(0xFFA8EFEE),
@@ -70,7 +71,7 @@ private val LightColors = lightColorScheme(
 // ChatGPT-style restrained chrome. Teal accents reseeded from the canonical
 // Hermes Teal (LENS_0 #041C1C, hue 196.8°) via the Material 3 tonal palette;
 // neutrals stay gray (green-tinted grays removed, contrast raised).
-private val DarkColors = darkColorScheme(
+internal val DarkColors = darkColorScheme(
     primary = Color(0xFF9BD0CF),
     onPrimary = Color(0xFF0C4848),
     primaryContainer = Color(0xFF255A5A),
@@ -108,25 +109,35 @@ private val DarkColors = darkColorScheme(
     scrim = Color.Black,
 )
 
-private val LightSemanticColors = HermesSemanticColors(
+internal val LightSemanticColors = HermesSemanticColors(
     active = Color(0xFFC68A16),
     onActive = Color(0xFF241A00),
     completed = Color(0xFF2D6A43),
     onCompleted = Color.White,
 )
 
-private val DarkSemanticColors = HermesSemanticColors(
+internal val DarkSemanticColors = HermesSemanticColors(
     active = Color(0xFFF2C64D),
     onActive = Color(0xFF241A00),
     completed = Color(0xFF8ED6A5),
     onCompleted = Color(0xFF0C3A1E),
 )
 
+/**
+ * [profile] defaults to [ReadingProfile.Standard], which keeps [LightColors],
+ * [DarkColors], and [HermesSemanticColors]. Paper substitutes [PaperColors]
+ * and [PaperSemanticColors] and does not follow [darkTheme].
+ */
 @Composable
 fun HermesAndroidTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    profile: ReadingProfile = ReadingProfile.Standard,
     content: @Composable () -> Unit,
 ) {
+    if (profile == ReadingProfile.Paper) {
+        PaperTheme(content)
+        return
+    }
     val colors = if (darkTheme) DarkColors else LightColors
     val semanticColors = if (darkTheme) DarkSemanticColors else LightSemanticColors
     CompositionLocalProvider(LocalHermesSemanticColors provides semanticColors) {
