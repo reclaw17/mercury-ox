@@ -9,12 +9,16 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.unsupportedpastels.hermesandroid.theme.HermesAndroidTheme
 import com.unsupportedpastels.mercury.core.activity.*
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSystemClock
+import java.time.Duration
 
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [35])
@@ -133,5 +137,99 @@ class ComposerActivityLineTest {
         compose.waitUntil(5000) {
             compose.onAllNodesWithContentDescription("Activity: Editing").fetchSemanticsNodes().isNotEmpty()
         }
+    }
+
+    @Test fun paperMotionOverrideKeepsMarkerOpaqueWithoutShimmer() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            HermesAndroidTheme(profile = ReadingProfile.Paper) {
+                ComposerActivityLine(
+                    working,
+                    1000,
+                    {},
+                    nowOverride = 66000,
+                    motionAllowedOverride = true,
+                )
+            }
+        }
+        compose.mainClock.advanceTimeByFrame()
+        val first = activityLineNode()
+        assertEquals(1f, first.config[ActivityMarkerAlpha])
+        assertEquals(false, first.config[ActivityLabelShimmer])
+        compose.mainClock.advanceTimeBy(1_600)
+        val later = activityLineNode()
+        assertEquals(1f, later.config[ActivityMarkerAlpha])
+        assertEquals(false, later.config[ActivityLabelShimmer])
+    }
+
+    @Test fun standardMotionOverridePulsesAndAppliesShimmer() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            HermesAndroidTheme(profile = ReadingProfile.Standard) {
+                ComposerActivityLine(
+                    working,
+                    1000,
+                    {},
+                    nowOverride = 66000,
+                    motionAllowedOverride = true,
+                )
+            }
+        }
+        compose.mainClock.advanceTimeByFrame()
+        val start = activityLineNode()
+        assertEquals(true, start.config[ActivityLabelShimmer])
+        val startAlpha = start.config[ActivityMarkerAlpha]
+        compose.mainClock.advanceTimeBy(450)
+        val midAlpha = activityLineNode().config[ActivityMarkerAlpha]
+        assertTrue("Standard activity marker must pulse when motion is allowed", midAlpha < startAlpha)
+    }
+
+    @Test fun paperHoldDoesNotRecomposeOnTheStandardCadence() {
+        val compositions = holdCompositions(ReadingProfile.Paper)
+        val afterEdit = compositions.afterCandidateChange
+        ShadowSystemClock.advanceBy(Duration.ofMillis(400))
+        compose.mainClock.advanceTimeBy(400)
+        assertEquals(afterEdit, compositions.count)
+        ShadowSystemClock.advanceBy(Duration.ofMillis(1_200))
+        compose.mainClock.advanceTimeBy(1_200)
+        assertTrue(compositions.count > afterEdit)
+    }
+
+    @Test fun standardHoldStillRecomposesOnThe200msCadence() {
+        val compositions = holdCompositions(ReadingProfile.Standard)
+        val afterEdit = compositions.afterCandidateChange
+        ShadowSystemClock.advanceBy(Duration.ofMillis(250))
+        compose.mainClock.advanceTimeBy(250)
+        assertTrue(
+            "Standard hold loop must still invalidate on its 200 ms cadence",
+            compositions.count > afterEdit,
+        )
+    }
+
+    private fun activityLineNode() =
+        compose.onNodeWithTag("Composer activity line").fetchSemanticsNode()
+
+    private fun holdCompositions(profile: ReadingProfile): HoldCompositionCounter {
+        compose.mainClock.autoAdvance = false
+        val candidate = mutableStateOf(working)
+        val counter = HoldCompositionCounter()
+        compose.setContent {
+            HermesAndroidTheme(profile = profile) {
+                rememberHeldActivityLine(
+                    candidate.value,
+                    holdCompositionObserver = { counter.count++ },
+                )
+            }
+        }
+        compose.mainClock.advanceTimeByFrame()
+        compose.runOnIdle { candidate.value = working.copy(label = "Editing") }
+        compose.mainClock.advanceTimeByFrame()
+        counter.afterCandidateChange = counter.count
+        return counter
+    }
+
+    private class HoldCompositionCounter {
+        var count = 0
+        var afterCandidateChange = 0
     }
 }

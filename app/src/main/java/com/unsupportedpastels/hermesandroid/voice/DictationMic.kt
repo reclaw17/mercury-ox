@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +41,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -192,7 +194,14 @@ fun DictationMicButton(
     }
 
     val level = (state as? DictationState.Recording)?.level ?: 0f
-    val pulse by animateFloatAsState(targetValue = 1f + level * 0.25f, label = "dictationPulse")
+    val paper = paperSuppressesMotion()
+    val pulse = if (paper) {
+        1f
+    } else {
+        val animated by animateFloatAsState(targetValue = 1f + level * 0.25f, label = "dictationPulse")
+        animated
+    }
+    val pressIndication = if (paper) null else ripple(bounded = false, radius = 22.dp)
 
     val description = when (state) {
         is DictationState.Recording -> "Stop dictation and insert"
@@ -248,7 +257,7 @@ fun DictationMicButton(
     Box(
         modifier = modifier
             .size(44.dp)
-            .indication(interactionSource, ripple(bounded = false, radius = 22.dp))
+            .indication(interactionSource, pressIndication)
             .semantics {
                 contentDescription = description
                 stateDescription = stateText
@@ -282,10 +291,14 @@ fun DictationMicButton(
     ) {
         when (state) {
             is DictationState.Transcribing ->
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                )
+                if (paper) {
+                    Text("…", style = MaterialTheme.typography.titleMedium)
+                } else {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                    )
+                }
             is DictationState.Recording ->
                 Icon(
                     imageVector = Icons.Outlined.Stop,

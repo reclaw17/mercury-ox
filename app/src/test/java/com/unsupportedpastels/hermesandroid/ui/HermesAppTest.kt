@@ -18,6 +18,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -1356,6 +1357,71 @@ class HermesAppTest {
 
         assertTrue("Expected amber indicator alpha to fade during the pulse", midPulseAlpha < startAlpha)
         assertEquals(startAlpha, completedCycleAlpha, 0.001f)
+    }
+
+    @Test
+    fun standardRunningProjectSessionIndicatorAlphaChanges() {
+        val snapshot = runningPulseSnapshot()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent {
+            HermesAndroidTheme(profile = ReadingProfile.Standard) {
+                HermesApp(snapshot = snapshot, resolvedReadingProfile = ReadingProfile.Standard)
+            }
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.onNodeWithTag("Project home row:Pulse project").performClick()
+        composeRule.mainClock.advanceTimeByFrame()
+        val pulse = composeRule.onNodeWithContentDescription(
+            "Pulse session is running",
+            useUnmergedTree = true,
+        )
+        val start = pulse.fetchSemanticsNode().config[SessionStatusPulseAlpha]
+        composeRule.mainClock.advanceTimeBy(450)
+        val faded = pulse.fetchSemanticsNode().config[SessionStatusPulseAlpha]
+        assertTrue("Standard running status must keep its pulse", faded < start)
+    }
+
+    @Test
+    fun paperRunningProjectSessionIndicatorDoesNotPulse() {
+        val snapshot = runningPulseSnapshot()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent {
+            HermesAndroidTheme(profile = ReadingProfile.Paper) {
+                HermesApp(snapshot = snapshot, resolvedReadingProfile = ReadingProfile.Paper)
+            }
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.onNodeWithTag("Project home row:Pulse project").performClick()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.onNodeWithContentDescription("Pulse session is running", useUnmergedTree = true)
+            .assertIsDisplayed()
+            .assert(SemanticsMatcher.keyNotDefined(SessionStatusPulseAlpha))
+        composeRule.mainClock.advanceTimeBy(900)
+        composeRule.onAllNodes(
+            SemanticsMatcher.keyIsDefined(SessionStatusPulseAlpha),
+            useUnmergedTree = true,
+        ).assertCountEquals(0)
+    }
+
+    private fun runningPulseSnapshot(): HermesGatewaySnapshot {
+        val projectId = ProjectId("project-pulse")
+        val session = SessionSummary(
+            DurableSessionId("pulse-session"),
+            "Pulse session",
+            projectId = projectId,
+            workspacePath = "/workspace/pulse",
+        )
+        val project = ProjectSummary(projectId, "Pulse project", "/workspace/pulse", 1, emptyList())
+        return connectedSnapshot.copy(
+            durableSessions = listOf(session),
+            projects = listOf(project),
+            projectState = ProjectLoadState.Loaded(listOf(project)),
+            projectSessions = mapOf(projectId to listOf(session)),
+            projectSessionStates = mapOf(
+                projectId to ProjectSessionLoadState.Loaded(listOf(session)),
+            ),
+            chatSessions = mapOf(session.id to ChatSessionSnapshot(isSending = true)),
+        )
     }
 
     @Test

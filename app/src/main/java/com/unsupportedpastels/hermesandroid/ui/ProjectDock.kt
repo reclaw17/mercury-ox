@@ -44,10 +44,23 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.unsupportedpastels.hermesandroid.app.ProjectSummary
 import com.unsupportedpastels.hermesandroid.app.ProjectId
 import com.unsupportedpastels.hermesandroid.theme.LocalHermesSemanticColors
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
+
+@Composable
+private fun projectDockWidth(expanded: Boolean): Dp {
+    val target = if (expanded) 228.dp else 76.dp
+    if (paperSuppressesMotion()) return target
+    val animated by animateDpAsState(
+        targetValue = target,
+        label = "Project dock width",
+    )
+    return animated
+}
 
 @Composable
 internal fun ProjectDock(
@@ -67,10 +80,7 @@ internal fun ProjectDock(
     onHide: () -> Unit,
 ) {
     val expanded = state == ProjectDockState.Expanded
-    val dockWidth by animateDpAsState(
-        targetValue = if (expanded) 228.dp else 76.dp,
-        label = "Project dock width",
-    )
+    val dockWidth = projectDockWidth(expanded)
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier

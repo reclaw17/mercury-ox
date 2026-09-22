@@ -147,3 +147,16 @@ fun HermesAndroidTheme(
         )
     }
 }
+
+/**
+ * Paper is stricter than system reduced motion. Decorative pulses, shimmers,
+ * ripples, and infinite spinners stay off even when the animator scale is 1.
+ * Standard keeps the animations it has today.
+ *
+ * An explicit [profile] of [ReadingProfile.Paper] suppresses motion even when
+ * this composition is not yet inside [PaperTheme].
+ */
+@Composable
+internal fun paperSuppressesMotion(
+    profile: ReadingProfile = LocalReadingProfile.current,
+): Boolean = profile == ReadingProfile.Paper || LocalReadingProfile.current == ReadingProfile.Paper

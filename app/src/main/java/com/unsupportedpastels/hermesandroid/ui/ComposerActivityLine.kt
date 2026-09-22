@@ -56,13 +56,23 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import com.unsupportedpastels.hermesandroid.theme.LocalHermesSemanticColors
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import com.unsupportedpastels.mercury.core.activity.ActivityLineHold
 import com.unsupportedpastels.mercury.core.activity.ActivityLineHoldState
 import com.unsupportedpastels.mercury.core.activity.ActivityLineKind
 import com.unsupportedpastels.mercury.core.activity.ActivityLinePolicy
 import com.unsupportedpastels.mercury.core.activity.ActivityLineState
 import kotlinx.coroutines.delay
+
+internal val ActivityMarkerAlpha = SemanticsPropertyKey<Float>("ActivityMarkerAlpha")
+internal var SemanticsPropertyReceiver.activityMarkerAlpha by ActivityMarkerAlpha
+
+/** True only while the label style carries the animated shimmer brush. */
+internal val ActivityLabelShimmer = SemanticsPropertyKey<Boolean>("ActivityLabelShimmer")
+internal var SemanticsPropertyReceiver.activityLabelShimmer by ActivityLabelShimmer
 
 /** Animator preference is read once; lifecycle changes stop decorative work. */
 @Composable
@@ -82,7 +92,12 @@ internal fun rememberActivityLineMotionAllowed(): Boolean {
 }
 
 @Composable
-internal fun rememberHeldActivityLine(candidate: ActivityLineState, nowOverride: Long? = null): ActivityLineState {
+internal fun rememberHeldActivityLine(
+    candidate: ActivityLineState,
+    nowOverride: Long? = null,
+    holdCompositionObserver: (() -> Unit)? = null,
+): ActivityLineState {
+    val paper = paperSuppressesMotion()
     var hold by remember { mutableStateOf(ActivityLineHoldState(null, null, 0)) }
     var tick by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     // Cache per input/tick, not per hold publication: SideEffect must not create
@@ -90,12 +105,27 @@ internal fun rememberHeldActivityLine(candidate: ActivityLineState, nowOverride:
     val next = remember(candidate, nowOverride, tick) {
         ActivityLineHold.step(hold, candidate, nowOverride ?: SystemClock.elapsedRealtime())
     }
-    SideEffect { hold = next }
-    LaunchedEffect(candidate, nowOverride, next.candidate != null) {
+    SideEffect {
+        hold = next
+        holdCompositionObserver?.invoke()
+    }
+    LaunchedEffect(candidate, nowOverride, next.candidate != null, paper) {
         if (nowOverride == null && next.candidate != null) {
-            while (true) {
-                delay(200)
-                tick = SystemClock.elapsedRealtime()
+            val since = next.candidateSinceMillis
+            if (paper) {
+                // Quiet-window hold may publish, but not on the Standard 200 ms
+                // cadence. The 1 s elapsed-text timer is a separate clock.
+                while (true) {
+                    val elapsed = SystemClock.elapsedRealtime() - since
+                    val remaining = (ActivityLineHold.QUIET_MILLIS - elapsed).coerceAtLeast(1_000L)
+                    delay(remaining)
+                    tick = SystemClock.elapsedRealtime()
+                }
+            } else {
+                while (true) {
+                    delay(200)
+                    tick = SystemClock.elapsedRealtime()
+                }
             }
         }
     }
@@ -114,7 +144,8 @@ internal fun ComposerActivityLine(
     // Hidden is immediate, including its semantics and parent layout spacing.
     if (state.kind == ActivityLineKind.Hidden) return
     val motionAllowed = motionAllowedOverride ?: rememberActivityLineMotionAllowed()
-    val animate = state.animated && motionAllowed
+    // Paper ignores motionAllowedOverride and the system animator scale.
+    val animate = state.animated && motionAllowed && !paperSuppressesMotion()
     var clockNow by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(nowOverride, state.showTimer, turnStartedAtEpochMillis) {
         if (nowOverride == null && state.showTimer && turnStartedAtEpochMillis != null) {
@@ -160,6 +191,8 @@ internal fun ComposerActivityLine(
                     contentDescription = "Activity: ${state.label}"
                     stateDescription = state.kind.name
                     liveRegion = LiveRegionMode.Polite
+                    activityMarkerAlpha = alpha
+                    activityLabelShimmer = animate
                 }
                 .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
