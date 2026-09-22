@@ -87,6 +87,7 @@ import com.unsupportedpastels.hermesandroid.gateway.RuntimeAccess
 import com.unsupportedpastels.hermesandroid.session.SavedSessionFilter
 import com.unsupportedpastels.hermesandroid.session.SessionListFilter
 import com.unsupportedpastels.hermesandroid.theme.LocalHermesSemanticColors
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -128,6 +129,7 @@ internal fun SessionListScreen(
     onCreateProject: () -> Unit,
     onNewSession: () -> Unit = {},
 ) {
+    val paperMotion = paperSuppressesMotion()
     val connectionState = snapshot.connectionState
     val semanticColors = LocalHermesSemanticColors.current
     val serverOrigin = (serverSettingsState as? ServerSettingsState.Ready)?.serverOrigin
@@ -420,7 +422,7 @@ internal fun SessionListScreen(
                             .fillMaxWidth()
                             .testTag("Opaque project search"),
                         color = MaterialTheme.colorScheme.background,
-                        shadowElevation = 3.dp,
+                        shadowElevation = if (paperMotion) 0.dp else 3.dp,
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             OutlinedTextField(
@@ -466,7 +468,8 @@ internal fun SessionListScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
-        PullToRefreshBox(
+        HomePullToRefresh(
+            paper = paperMotion,
             isRefreshing = isRefreshing,
             onRefresh = onRefresh,
             modifier = Modifier
@@ -836,10 +839,54 @@ internal fun SessionListScreen(
  */
 @Composable
 internal fun WorkingIndicator(modifier: Modifier = Modifier) {
-    CircularProgressIndicator(
-        modifier = modifier
-            .size(14.dp)
-            .semantics { contentDescription = "Agent is working" },
-        strokeWidth = 2.dp,
-    )
+    if (paperSuppressesMotion()) {
+        StaticWorkMark(
+            contentDescription = "Agent is working",
+            modifier = modifier.size(14.dp),
+        )
+    } else {
+        CircularProgressIndicator(
+            modifier = modifier
+                .size(14.dp)
+                .semantics { contentDescription = "Agent is working" },
+            strokeWidth = 2.dp,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomePullToRefresh(
+    paper: Boolean,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit,
+) {
+    if (paper) {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
+            modifier = modifier,
+            indicator = {
+                if (isRefreshing) {
+                    Text(
+                        "Refreshing",
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 8.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            },
+            content = content,
+        )
+    } else {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
+            modifier = modifier,
+            content = content,
+        )
+    }
 }

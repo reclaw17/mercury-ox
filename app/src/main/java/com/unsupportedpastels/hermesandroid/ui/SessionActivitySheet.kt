@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.unsupportedpastels.hermesandroid.app.RunToolRow
 import com.unsupportedpastels.hermesandroid.app.RunToolState
 import com.unsupportedpastels.hermesandroid.theme.LocalHermesSemanticColors
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import com.unsupportedpastels.hermesandroid.app.ProcessRow
 import com.unsupportedpastels.hermesandroid.gateway.BackgroundTaskRow
 
@@ -49,8 +50,15 @@ private fun ProgressUpdateButton(onGetUpdate: () -> Unit, refreshing: Boolean) {
             if (refreshing) stateDescription = "Refreshing"
         },
     ) {
-        if (refreshing) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-        else Icon(Icons.Outlined.Refresh, contentDescription = null)
+        if (refreshing) {
+            if (paperSuppressesMotion()) {
+                Text("…", style = MaterialTheme.typography.titleMedium)
+            } else {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            }
+        } else {
+            Icon(Icons.Outlined.Refresh, contentDescription = null)
+        }
     }
 }
 
@@ -260,11 +268,19 @@ private fun ProgressRow(row: SessionProgressItem, kind: ActivitySheetProgressRow
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.tertiary,
             )
-            ActivitySheetProgressRowKind.Active -> CircularProgressIndicator(
-                modifier = Modifier.size(14.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            ActivitySheetProgressRowKind.Active -> if (paperSuppressesMotion()) {
+                StaticWorkMark(
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(14.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
             ActivitySheetProgressRowKind.Stale -> Text(
                 "•",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -309,7 +325,7 @@ private fun ActivitySheetToolRow(tool: RunToolRow, live: Boolean) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (running && live) CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp,
+        if (running && live && !paperSuppressesMotion()) CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp,
             color = LocalHermesSemanticColors.current.active)
         else if (running) Text("•", style = MaterialTheme.typography.bodySmall)
         else Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(16.dp),

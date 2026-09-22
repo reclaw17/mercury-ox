@@ -59,6 +59,7 @@ import com.unsupportedpastels.hermesandroid.app.ProjectSummary
 import com.unsupportedpastels.hermesandroid.app.SessionSummary
 import com.unsupportedpastels.hermesandroid.app.validProjectWorkspacePath
 import com.unsupportedpastels.hermesandroid.theme.LocalHermesSemanticColors
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 
@@ -304,11 +305,19 @@ internal fun SessionInboxRow(
             contentAlignment = Alignment.Center,
         ) {
             when {
-                isWorking -> PulsingSessionStatusIndicator(
-                    color = activeColor,
-                    contentDescription = "${session.title} is running",
-                    size = 10.dp,
-                )
+                isWorking -> if (paperSuppressesMotion()) {
+                    StaticWorkMark(
+                        contentDescription = "${session.title} is running",
+                        modifier = Modifier.size(10.dp),
+                        color = activeColor,
+                    )
+                } else {
+                    PulsingSessionStatusIndicator(
+                        color = activeColor,
+                        contentDescription = "${session.title} is running",
+                        size = 10.dp,
+                    )
+                }
                 isUnreadComplete -> Box(
                     modifier = Modifier
                         .size(10.dp)
