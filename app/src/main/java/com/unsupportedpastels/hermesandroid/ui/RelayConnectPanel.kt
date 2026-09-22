@@ -121,7 +121,7 @@ internal fun RelayConnectPanel(
                     style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
                 )
                 Text(
-                    "Confirm that the host shows exactly this code before approving the device.",
+                    "Compare this code with the one on YOUR Hermes host before approving. A QR from someone else pairs this phone with their agent — files, shell, and tools included.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -115,7 +115,7 @@ internal object SessionNotificationPoster {
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .build())
     }
 
@@ -146,7 +146,7 @@ internal object SessionNotificationPoster {
             .addAction(0, "Open session", openAppIntent(context, sessionId.value))
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .build())
     }
 
@@ -166,7 +166,7 @@ internal object SessionNotificationPoster {
             .setOnlyAlertOnce(true)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .build()
 
     internal fun notificationManager(context: Context): NotificationManager {
@@ -177,11 +177,17 @@ internal object SessionNotificationPoster {
 
     private fun ensureChannels(manager: NotificationManager) {
         manager.createNotificationChannels(listOf(
-            NotificationChannel(CHANNEL_ACTIVE, "Active Hermes tasks", NotificationManager.IMPORTANCE_LOW),
-            NotificationChannel(CHANNEL_ATTENTION, "Hermes needs attention", NotificationManager.IMPORTANCE_HIGH),
-            NotificationChannel(CHANNEL_COMPLETE, "Completed Hermes tasks", NotificationManager.IMPORTANCE_DEFAULT),
+            secretChannel(CHANNEL_ACTIVE, "Active Hermes tasks", NotificationManager.IMPORTANCE_LOW),
+            secretChannel(CHANNEL_ATTENTION, "Hermes needs attention", NotificationManager.IMPORTANCE_HIGH),
+            secretChannel(CHANNEL_COMPLETE, "Completed Hermes tasks", NotificationManager.IMPORTANCE_DEFAULT),
         ))
     }
+
+    private fun secretChannel(id: String, name: String, importance: Int): NotificationChannel =
+        NotificationChannel(id, name, importance).apply {
+            lockscreenVisibility = Notification.VISIBILITY_SECRET
+            setShowBadge(true)
+        }
 
     private fun notificationId(sessionId: String, kind: Int): Int = 31 * sessionId.hashCode() + kind
 

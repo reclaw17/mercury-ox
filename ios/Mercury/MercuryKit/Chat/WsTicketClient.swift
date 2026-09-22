@@ -62,9 +62,10 @@ final class WsTicketClient: WsTicketClienting, @unchecked Sendable {
             throw ChatError.transport("Could not build Hermes ticket request")
         }
         if accessToken == nil,
-           let url = request.url,
-           let storage = session.configuration.httpCookieStorage {
-            let cookies = storage.cookies(for: url) ?? []
+           let url = request.url {
+            let fromStore = OriginCookieStore.shared.cookies(forOrigin: origin)
+            let fromSession = session.configuration.httpCookieStorage?.cookies(for: url) ?? []
+            let cookies = OriginCookiePolicy.filter(fromStore + fromSession, requestURL: url, origin: origin)
             if !cookies.isEmpty {
                 request.setValue(
                     HTTPCookie.requestHeaderFields(with: cookies)["Cookie"],

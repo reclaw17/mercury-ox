@@ -45,6 +45,13 @@ enum ServerOrigin {
         MercuryCore.ServerOriginPolicy.shared.allowsCleartextHttp(origin: origin)
     }
 
+    /// Gate for every outbound URL (redirects, images, tickets), not just the
+    /// origin the user typed. Public HTTP, mDNS HTTP, and Tailscale CGNAT HTTP
+    /// fail closed. HTTPS/WSS always pass.
+    static func requestURLAllowed(_ url: String) -> Bool {
+        MercuryCore.ServerOriginPolicy.shared.requestUrlAllowed(url: url)
+    }
+
     /// The pre-2026-08-30 normalization (no default-port elision, no
     /// punycode). Exists ONLY so Keychain entries written under the old
     /// canonical form can be found once and migrated; never use it for new

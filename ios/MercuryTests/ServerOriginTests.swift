@@ -77,4 +77,29 @@ final class ServerOriginTests: XCTestCase {
         // Garbage → false.
         XCTAssertFalse(ServerOrigin.allowsCleartextHTTP("nonsense"))
     }
+
+    func testMdnsAndTailscaleCleartextAreRejected() {
+        XCTAssertNil(ServerOrigin.normalize("http://nas.local"))
+        XCTAssertEqual(
+            ServerOrigin.validationFailure("http://nas.local"),
+            "Plain HTTP is not allowed for .local names because mDNS can be spoofed. Use HTTPS or a numeric address."
+        )
+        XCTAssertNil(ServerOrigin.normalize("http://100.64.1.20"))
+        XCTAssertEqual(
+            ServerOrigin.validationFailure("http://100.64.1.20"),
+            "Tailscale addresses (100.64/10) must use HTTPS (Tailscale Serve). Plain HTTP is not allowed."
+        )
+        XCTAssertEqual(ServerOrigin.normalize("https://nas.local"), "https://nas.local")
+        XCTAssertEqual(ServerOrigin.normalize("https://100.64.1.20"), "https://100.64.1.20")
+        XCTAssertTrue(ServerOrigin.allowsCleartextHTTP("http://[fd12:3456:789a:1::1]"))
+    }
+
+    func testRequestURLAllowedGatesEveryURL() {
+        XCTAssertTrue(ServerOrigin.requestURLAllowed("https://portal.nousresearch.com/api/agents"))
+        XCTAssertTrue(ServerOrigin.requestURLAllowed("http://192.168.1.5:8080/api/status"))
+        XCTAssertFalse(ServerOrigin.requestURLAllowed("http://example.com/logo.png"))
+        XCTAssertFalse(ServerOrigin.requestURLAllowed("http://nas.local/secret"))
+        XCTAssertFalse(ServerOrigin.requestURLAllowed("http://100.64.1.20/api"))
+        XCTAssertTrue(ServerOrigin.requestURLAllowed("wss://relay.example/v1"))
+    }
 }

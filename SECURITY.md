@@ -30,7 +30,14 @@ Managed artifact downloads remain bounded by the client transport. Explicit shar
 ## Credential storage
 
 - **Android:** access/refresh tokens, cookies, and Relay pairings are encrypted with Tink AEAD keys held in the Android Keystore, each store under its own master key, scoped to the normalized server origin. Auto Backup is disabled.
-- **iOS:** access/refresh tokens, the server catalog and Relay pairings live in the Keychain as `kSecClassGenericPassword` items marked `ThisDeviceOnly` (never synced to iCloud): direct-mode tokens under one service keyed by origin, the server catalog under another, and Relay pairings under a third (`relay-targets`), so removing or renaming one side can never touch the other's keys. Basic-auth session cookies are different: they are held by the system `HTTPCookieStorage`, scoped by cookie domain rather than by normalized origin, and are not Keychain-protected. Sign out clears them. No `keychain-access-groups` entitlement is declared, so app extensions cannot read the Keychain. The **Add to Mercury** share extension exchanges only staged attachment files with the app through the App Group container and holds no credentials.
+- **iOS:** access/refresh tokens, the server catalog, Relay pairings, and basic-auth session cookies live in the Keychain as `kSecClassGenericPassword` items marked `ThisDeviceOnly` (never synced to iCloud): direct-mode tokens under one service keyed by origin, the server catalog under another, Relay pairings under a third (`relay-targets`), and cookies under a fourth (`com.unsupportedpastels.mercury.cookies`). Cookies are replayed only for the same scheme, host, and port — they are not stored in `HTTPCookieStorage.shared`. Sign out clears that origin's jar. No `keychain-access-groups` entitlement is declared, so app extensions cannot read the Keychain. The **Add to Mercury** share extension exchanges only staged attachment files with the app through the App Group container and holds no credentials.
+
+## Network
+
+- Plain HTTP is allowed only for loopback, RFC1918, IPv6 unique-local, and link-local addresses. Public hosts, mDNS `*.local` names, and Tailscale CGNAT (`100.64.0.0/10`) must use HTTPS. The same gate runs on every request (Android Ktor plugin, iOS `HermesHTTPClient`), not only when the user types an origin. iOS ATS still permits `.local` HTTP via `NSAllowsLocalNetworking`; the client gate is what closes that.
+- Android uses `networkSecurityConfig` (system CAs only, no user CA, no global `usesCleartextTraffic`). iOS uses ATS `NSAllowsLocalNetworking` without `NSAllowsArbitraryLoads`.
+- Share-sheet ingress is limited to explicit MIME types and `content://` URIs. HTML, SVG, APKs, and executables are rejected. The in-app picker is unchanged.
+- Completion and attention notifications use `VISIBILITY_SECRET` on Android and a hidden-previews category on iOS so lock-screen content is not the agent transcript. Relay encrypted excerpts stay off until the user opts in.
 
 ## Mercury Relay
 

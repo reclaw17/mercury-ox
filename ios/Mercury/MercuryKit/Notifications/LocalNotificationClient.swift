@@ -97,6 +97,7 @@ final class LocalNotificationClient: LocalNotificationScheduling, @unchecked Sen
         content.body = notification.body
         content.sound = .default
         content.threadIdentifier = notification.sessionID
+        content.categoryIdentifier = "MERCURY_SENSITIVE"
         var userInfo: [String: Any] = ["mercury.sessionID": notification.sessionID]
         if let route,
            let url = MercuryDeepLink.sessionURL(

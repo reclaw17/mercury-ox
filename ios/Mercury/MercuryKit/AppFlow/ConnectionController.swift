@@ -228,8 +228,8 @@ final class ConnectionController {
     ///
     /// Persistence:
     /// - JSON token outcome → `TokenPair` in the Keychain scoped to the origin.
-    /// - Cookie outcome → cookies merged into `HTTPCookieStorage.shared` for
-    ///   the origin's domain (the shared store replays them automatically).
+    /// - Cookie outcome → name/value pairs in `OriginCookieStore` (Keychain,
+    ///   ThisDeviceOnly, keyed by scheme+host+port).
     ///
     /// On any failure the phase becomes `.failed("Sign-in failed")`; no token
     /// material ever appears in error strings or logs.
@@ -951,8 +951,7 @@ final class ConnectionController {
     }
 
     private func hasSessionCookie(for origin: String) -> Bool {
-        guard let url = URL(string: origin) else { return false }
-        return !(HTTPCookieStorage.shared.cookies(for: url) ?? []).isEmpty
+        OriginCookieStore.shared.hasCookies(forOrigin: origin)
     }
 
     /// Persists a successful self-hosted sign-in outcome. Never logged.
@@ -984,22 +983,9 @@ final class ConnectionController {
 
     static let portalAccountKey = "portal.nousresearch.com"
 
-    /// Merges cookie name→value pairs into the process-wide cookie store for
-    /// the origin's host so subsequent requests replay them.
+    /// Persists cookie name→value pairs under the origin-scoped Keychain jar.
     private func mergeCookiesIntoSharedStore(_ dict: [String: String], origin: String) {
-        guard let url = URL(string: origin), let host = url.host else { return }
-        for (name, value) in dict {
-            guard let cookie = HTTPCookie(
-                properties: [
-                    .domain: host,
-                    .path: "/",
-                    .name: name,
-                    .value: value,
-                    .secure: url.scheme == "https" ? "TRUE" : "FALSE",
-                ]
-            ) else { continue }
-            HTTPCookieStorage.shared.setCookie(cookie)
-        }
+        OriginCookieStore.shared.store(nameValues: dict, origin: origin)
     }
 
     /// Maps a thrown error to a friendly, secret-free message.
@@ -1043,6 +1029,7 @@ final class ConnectionController {
     /// Removes all shared-store cookies whose domain covers (or is covered
     /// by) the origin's host. Cookies for any other host are left untouched.
     private func purgeCookies(hostOf origin: String) {
+        OriginCookieStore.shared.purge(origin: origin)
         guard let url = URL(string: origin), let host = url.host?.lowercased() else { return }
         let storage = HTTPCookieStorage.shared
         for cookie in storage.cookies ?? [] where Self.cookie(cookie, coversHost: host) {
@@ -1050,13 +1037,12 @@ final class ConnectionController {
         }
     }
 
-    /// True when `cookie` would be replayed for requests to `host`.
-    /// Leading-dot cookie domains are stripped; both exact and subdomain
-    /// relationships count (`api.hermes.test` cookies cover `hermes.test`
-    /// sign-out and vice versa).
+    /// Exact-host match after stripping a leading dot. Parent-domain sharing
+    /// (`api.example` covering `example`) is rejected so a cookie issued for
+    /// one origin cannot be cleared — or replayed — against another.
     static func cookie(_ cookie: HTTPCookie, coversHost host: String) -> Bool {
         var domain = cookie.domain.lowercased()
         if domain.hasPrefix(".") { domain.removeFirst() }
-        return host == domain || host.hasSuffix("." + domain) || domain.hasSuffix("." + host)
+        return host == domain
     }
 }

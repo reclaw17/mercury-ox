@@ -105,7 +105,7 @@ struct RelayPairingView: View {
             Label("Paired — waiting for approval", systemImage: "clock.arrow.circlepath")
                 .font(.headline)
 
-            Text("Confirm on the host that it shows exactly this code, then approve the device there:")
+            Text("Compare this code with the one on YOUR Hermes host before approving. A QR from someone else pairs this phone with their agent — files, shell, and tools included.")
                 .font(.subheadline)
                 .foregroundStyle(Color.secondary)
 

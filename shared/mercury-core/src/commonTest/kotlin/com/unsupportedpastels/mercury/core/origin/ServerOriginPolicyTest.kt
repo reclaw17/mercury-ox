@@ -27,7 +27,7 @@ class ServerOriginPolicyTest {
         assertEquals("https://10.1.2.3:8080", valid("10.1.2.3:8080"))
         assertEquals("http://192.168.1.5:8080", valid("192.168.1.5:8080", useTls = false))
         assertEquals(
-            "Plain HTTP is allowed only for local or private-network servers",
+            ServerOriginPolicy.PUBLIC_CLEARTEXT,
             reason("hermes.example.com", useTls = false),
         )
     }
@@ -76,6 +76,8 @@ class ServerOriginPolicyTest {
         assertEquals("https://[::1]", valid("https://[::1]"))
         assertEquals("https://[2001:db8::1]:8443", valid("HTTPS://[2001:DB8::1]:8443"))
         assertEquals("https://[::1]", valid("https://[::1]:443"))
+        assertEquals("http://[fd12:3456:789a:1::1]", valid("http://[fd12:3456:789a:1::1]"))
+        assertEquals("http://[fe80::1]", valid("http://[fe80::1]"))
     }
 
     // --- rejections -----------------------------------------------------------
@@ -95,10 +97,18 @@ class ServerOriginPolicyTest {
         assertEquals("Server origin must include a valid host", reason("https://exa mple.com"))
         assertEquals("Server origin must include a valid host", reason("https://bad_host.example"))
         assertEquals("Server origin must include a valid host", reason("https://a..b"))
-        assertEquals(
-            "Plain HTTP is allowed only for local or private-network servers",
-            reason("http://example.com"),
-        )
+        assertEquals(ServerOriginPolicy.PUBLIC_CLEARTEXT, reason("http://example.com"))
+        assertEquals(ServerOriginPolicy.MDNS_CLEARTEXT, reason("http://nas.local"))
+        assertEquals(ServerOriginPolicy.MDNS_CLEARTEXT, reason("http://printer.local:8080"))
+        assertEquals(ServerOriginPolicy.TAILSCALE_CLEARTEXT, reason("http://100.64.1.20"))
+        assertEquals(ServerOriginPolicy.TAILSCALE_CLEARTEXT, reason("http://100.127.255.255:8080"))
+    }
+
+    @Test
+    fun httpsRemainsValidForMdnsAndTailscale() {
+        assertEquals("https://nas.local", valid("https://nas.local"))
+        assertEquals("https://100.64.1.20", valid("https://100.64.1.20"))
+        assertEquals("https://svc.local", valid("https://svc.local"))
     }
 
     // --- webSocketValue -------------------------------------------------------
@@ -118,15 +128,19 @@ class ServerOriginPolicyTest {
     @Test
     fun loopbackAndPrivateRangesClassify() {
         for (origin in listOf(
-            "http://localhost", "http://localhost:9119", "https://svc.local",
+            "http://localhost", "http://localhost:9119",
             "http://127.0.0.1", "http://10.1.2.3", "http://172.16.0.1",
             "http://172.31.255.255", "http://192.168.1.5", "http://[::1]",
+            "http://[fd12:3456:789a:1::1]", "http://[fe80::1]",
+            "http://169.254.1.1",
         )) {
             assertTrue(ServerOriginPolicy.isLoopbackOrPrivate(origin), origin)
         }
         for (origin in listOf(
             "https://example.com", "http://172.15.0.1", "http://172.32.0.1",
             "http://192.169.1.1", "http://11.0.0.1", "http://8.8.8.8",
+            "https://svc.local", "http://nas.local", "http://100.64.1.20",
+            "http://100.100.1.1",
         )) {
             assertFalse(ServerOriginPolicy.isLoopbackOrPrivate(origin), origin)
         }
@@ -139,6 +153,23 @@ class ServerOriginPolicyTest {
         assertEquals("http://127.0.0.1.", valid("http://127.0.0.1."))
         assertFalse(ServerOriginPolicy.allowsCleartextHttp("http://example.com"))
         assertFalse(ServerOriginPolicy.allowsCleartextHttp("https://192.168.1.5"))
+        assertFalse(ServerOriginPolicy.allowsCleartextHttp("http://nas.local"))
+        assertFalse(ServerOriginPolicy.allowsCleartextHttp("http://100.64.1.20"))
+        assertTrue(ServerOriginPolicy.allowsCleartextHttp("http://[fd12:3456:789a:1::1]"))
+    }
+
+    @Test
+    fun requestUrlGateBlocksPublicHttpEvenWithPath() {
+        assertTrue(ServerOriginPolicy.requestUrlAllowed("https://portal.nousresearch.com/api/agents"))
+        assertTrue(ServerOriginPolicy.requestUrlAllowed("http://192.168.1.5:8080/api/status"))
+        assertTrue(ServerOriginPolicy.requestUrlAllowed("http://10.0.2.2/"))
+        assertFalse(ServerOriginPolicy.requestUrlAllowed("http://example.com/logo.png"))
+        assertFalse(ServerOriginPolicy.requestUrlAllowed("http://nas.local/secret"))
+        assertFalse(ServerOriginPolicy.requestUrlAllowed("http://100.64.1.20/api"))
+        assertFalse(ServerOriginPolicy.requestUrlAllowed("ftp://192.168.1.5/x"))
+        assertTrue(ServerOriginPolicy.requestUrlAllowed("wss://relay.example/v1"))
+        assertTrue(ServerOriginPolicy.requestUrlAllowed("ws://127.0.0.1:9119/ws"))
+        assertFalse(ServerOriginPolicy.requestUrlAllowed("ws://example.com/ws"))
     }
 
     @Test

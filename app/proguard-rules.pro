@@ -1,7 +1,7 @@
-# R8/ProGuard rules for HAM. Minification is currently disabled for release
-# builds; these rules exist so that enabling it is safe. Most libraries ship
-# consumer rules in their AARs (Ktor, kotlinx-serialization, Tink), so this
-# file only pins the reflection surfaces this app relies on directly.
+# R8/ProGuard rules for Mercury. Minification is enabled for release builds.
+# Most libraries ship consumer rules in their AARs (Ktor, kotlinx.serialization,
+# Tink), so this file only pins the reflection surfaces this app and the shared
+# core rely on directly.
 
 # --- kotlinx.serialization ---
 # Generated serializers and companion serializer() lookups for this app's
@@ -13,6 +13,14 @@
 }
 -keepclasseswithmembers class com.unsupportedpastels.hermesandroid.** {
     kotlinx.serialization.KSerializer serializer(...);
+}
+
+# --- Shared KMP core ---
+# Protocol types, origin policy, and generated serializers must survive R8.
+-keep class com.unsupportedpastels.mercury.core.** { *; }
+-keep,includedescriptorclasses class com.unsupportedpastels.mercury.core.**$$serializer { *; }
+-keepclassmembers class com.unsupportedpastels.mercury.core.** {
+    *** Companion;
 }
 
 # --- Ktor (CIO engine) ---

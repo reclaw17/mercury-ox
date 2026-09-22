@@ -121,6 +121,7 @@ internal fun validateGatewayMediaPath(value: String): Boolean =
 internal fun HttpClientConfig<*>.configureRemoteImageHttpClient() {
     followRedirects = false
     expectSuccess = false
+    install(com.unsupportedpastels.hermesandroid.connection.HermesCleartextGate)
     install(HttpTimeout) {
         connectTimeoutMillis = REMOTE_IMAGE_TIMEOUT_MILLIS
         requestTimeoutMillis = REMOTE_IMAGE_TIMEOUT_MILLIS

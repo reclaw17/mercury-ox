@@ -4,9 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.unsupportedpastels.mercury.core.attachment.ShareAdmissionPolicy
 import java.util.concurrent.atomic.AtomicLong
 
-private const val MAX_FORWARDED_URIS = 20
 private val requestIds = AtomicLong()
 
 internal fun nextShareRequestId(): Long = requestIds.incrementAndGet()
@@ -34,7 +34,7 @@ internal fun parseIncomingShare(context: Context, incoming: Intent, requestId: L
 private fun Intent.sharedContentUris(): List<Uri> {
     val values = buildList {
         clipData?.let { clip ->
-            repeat(clip.itemCount.coerceAtMost(MAX_FORWARDED_URIS)) { index ->
+            repeat(clip.itemCount.coerceAtMost(ShareAdmissionPolicy.MAX_FORWARDED_URIS)) { index ->
                 clip.getItemAt(index).uri?.let(::add)
             }
         }
@@ -46,9 +46,9 @@ private fun Intent.sharedContentUris(): List<Uri> {
     }
     return values
         .asSequence()
-        .filter { it.scheme.equals("content", ignoreCase = true) }
+        .filter { ShareAdmissionPolicy.isAllowedContentUri(it.toString()) }
         .distinctBy(Uri::toString)
-        .take(MAX_FORWARDED_URIS)
+        .take(ShareAdmissionPolicy.MAX_FORWARDED_URIS)
         .toList()
 }
 
@@ -72,10 +72,13 @@ private fun resolveCandidate(context: Context, uri: Uri): SharedAttachmentCandid
             if (sizeColumn >= 0 && !cursor.isNull(sizeColumn)) sizeBytes = cursor.getLong(sizeColumn)
         }
     }
+    val displayName = rawName ?: uri.lastPathSegment.orEmpty()
+    val mimeType = context.contentResolver.getType(uri)
+    if (!ShareAdmissionPolicy.isAllowedMime(mimeType, displayName)) return@runCatching null
     SharedAttachmentCandidate(
         uri = uri.toString(),
-        displayName = rawName ?: uri.lastPathSegment.orEmpty(),
-        mimeType = context.contentResolver.getType(uri),
+        displayName = displayName,
+        mimeType = mimeType,
         sizeBytes = sizeBytes,
     )
 }.getOrNull()

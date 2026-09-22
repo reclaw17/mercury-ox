@@ -43,8 +43,7 @@ Release build:
   exists. It targets the internal track for package
   `com.unsupportedpastels.hermesandroid` (kept for Play continuity; the iOS
   bundle is `com.unsupportedpastels.mercury`).
-- Release builds are not minified (`isMinifyEnabled = false`); enabling R8
-  requires reviewing `app/proguard-rules.pro` first.
+- Release builds minify with R8 (`isMinifyEnabled = true`, `isShrinkResources = true`). Keep `app/proguard-rules.pro` in sync with any new reflection surface.
 - Device check before publishing: install the signed APK on a phone and, if
   available, a foldable; connect, send a prompt, background the app during a
   turn, and confirm the completion notification opens the right session.
