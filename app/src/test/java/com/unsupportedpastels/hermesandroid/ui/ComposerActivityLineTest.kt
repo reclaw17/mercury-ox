@@ -17,8 +17,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
-import org.robolectric.shadows.ShadowSystemClock
-import java.time.Duration
 
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [35])
@@ -187,10 +185,8 @@ class ComposerActivityLineTest {
     @Test fun paperHoldDoesNotRecomposeOnTheStandardCadence() {
         val compositions = holdCompositions(ReadingProfile.Paper)
         val afterEdit = compositions.afterCandidateChange
-        ShadowSystemClock.advanceBy(Duration.ofMillis(400))
         compose.mainClock.advanceTimeBy(400)
         assertEquals(afterEdit, compositions.count)
-        ShadowSystemClock.advanceBy(Duration.ofMillis(1_200))
         compose.mainClock.advanceTimeBy(1_200)
         assertTrue(compositions.count > afterEdit)
     }
@@ -198,7 +194,6 @@ class ComposerActivityLineTest {
     @Test fun standardHoldStillRecomposesOnThe200msCadence() {
         val compositions = holdCompositions(ReadingProfile.Standard)
         val afterEdit = compositions.afterCandidateChange
-        ShadowSystemClock.advanceBy(Duration.ofMillis(250))
         compose.mainClock.advanceTimeBy(250)
         assertTrue(
             "Standard hold loop must still invalidate on its 200 ms cadence",
@@ -222,8 +217,8 @@ class ComposerActivityLineTest {
             }
         }
         compose.mainClock.advanceTimeByFrame()
-        compose.runOnIdle { candidate.value = working.copy(label = "Editing") }
-        compose.mainClock.advanceTimeByFrame()
+        compose.runOnUiThread { candidate.value = working.copy(label = "Editing") }
+        compose.waitForIdle()
         counter.afterCandidateChange = counter.count
         return counter
     }

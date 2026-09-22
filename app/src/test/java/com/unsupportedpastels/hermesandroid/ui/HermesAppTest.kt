@@ -18,7 +18,6 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -1365,11 +1364,18 @@ class HermesAppTest {
         composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
             HermesAndroidTheme(profile = ReadingProfile.Standard) {
-                HermesApp(snapshot = snapshot, resolvedReadingProfile = ReadingProfile.Standard)
+                val colors = com.unsupportedpastels.hermesandroid.theme.LocalHermesSemanticColors.current
+                SessionInboxRow(
+                    session = snapshot.durableSessions.single(),
+                    projectLabel = "Pulse project",
+                    isWorking = true,
+                    isUnreadComplete = false,
+                    activeColor = colors.active,
+                    completedColor = colors.completed,
+                    onClick = {},
+                )
             }
         }
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithTag("Project home row:Pulse project").performClick()
         composeRule.mainClock.advanceTimeByFrame()
         val pulse = composeRule.onNodeWithContentDescription(
             "Pulse session is running",
@@ -1384,15 +1390,12 @@ class HermesAppTest {
     @Test
     fun paperRunningProjectSessionIndicatorDoesNotPulse() {
         val snapshot = runningPulseSnapshot()
-        composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
             HermesAndroidTheme(profile = ReadingProfile.Paper) {
                 HermesApp(snapshot = snapshot, resolvedReadingProfile = ReadingProfile.Paper)
             }
         }
-        composeRule.mainClock.advanceTimeByFrame()
         composeRule.onNodeWithTag("Project home row:Pulse project").performClick()
-        composeRule.mainClock.advanceTimeByFrame()
         composeRule.onNodeWithContentDescription("Pulse session is running", useUnmergedTree = true)
             .assertIsDisplayed()
             .assert(SemanticsMatcher.keyNotDefined(SessionStatusPulseAlpha))

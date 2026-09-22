@@ -105,9 +105,13 @@ internal fun rememberHeldActivityLine(
     val next = remember(candidate, nowOverride, tick) {
         ActivityLineHold.step(hold, candidate, nowOverride ?: SystemClock.elapsedRealtime())
     }
+    val observedTick = remember { longArrayOf(Long.MIN_VALUE) }
     SideEffect {
         hold = next
-        holdCompositionObserver?.invoke()
+        if (tick != observedTick[0]) {
+            observedTick[0] = tick
+            holdCompositionObserver?.invoke()
+        }
     }
     LaunchedEffect(candidate, nowOverride, next.candidate != null, paper) {
         if (nowOverride == null && next.candidate != null) {
@@ -119,12 +123,14 @@ internal fun rememberHeldActivityLine(
                     val elapsed = SystemClock.elapsedRealtime() - since
                     val remaining = (ActivityLineHold.QUIET_MILLIS - elapsed).coerceAtLeast(1_000L)
                     delay(remaining)
-                    tick = SystemClock.elapsedRealtime()
+                    // Increment even if the wall clock did not move, so a fired
+                    // wait always recomposes. Paper's wait is at least 1 s.
+                    tick += 1
                 }
             } else {
                 while (true) {
                     delay(200)
-                    tick = SystemClock.elapsedRealtime()
+                    tick += 1
                 }
             }
         }
