@@ -175,8 +175,6 @@ private fun screenshotPaperTranscriptSnapshot(): HermesGatewaySnapshot = screens
                     ChatMessageRole.Assistant,
                     "Closed fence:\n\n```kotlin\n$screenshotPaperCodeBody\n```",
                 ),
-                ChatMessage(ChatMessageRole.Tool, "read_file · HermesApp.kt"),
-                ChatMessage(ChatMessageRole.Assistant, "The adaptive shell is unchanged."),
             ),
         ),
     ),
