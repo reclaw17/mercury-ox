@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -133,7 +134,15 @@ internal fun HostFileBrowserSheet(
                 ) { Text("Refresh") }
             }
             if (loading && listing == null) {
-                CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+                if (paperSuppressesMotion()) {
+                    Text(
+                        "Loading host files",
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                } else {
+                    CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+                }
             }
             error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)

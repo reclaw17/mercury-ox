@@ -1,6 +1,7 @@
 package com.unsupportedpastels.hermesandroid.ui
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
@@ -49,7 +50,10 @@ import androidx.compose.ui.unit.dp
 import com.unsupportedpastels.hermesandroid.app.ProjectSummary
 import com.unsupportedpastels.hermesandroid.app.ProjectId
 import com.unsupportedpastels.hermesandroid.theme.LocalHermesSemanticColors
+import com.unsupportedpastels.hermesandroid.theme.LocalReadingProfile
+import com.unsupportedpastels.hermesandroid.theme.ReadingPaneDivider
 import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
+import com.unsupportedpastels.hermesandroid.theme.readingPaneColor
 
 @Composable
 private fun projectDockWidth(expanded: Boolean): Dp {
@@ -82,7 +86,7 @@ internal fun ProjectDock(
     val expanded = state == ProjectDockState.Expanded
     val dockWidth = projectDockWidth(expanded)
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = readingPaneColor(MaterialTheme.colorScheme.surfaceContainer),
         modifier = Modifier
             .width(dockWidth)
             .fillMaxSize()
@@ -173,7 +177,7 @@ internal fun ProjectDock(
                     )
                 }
             }
-            HorizontalDivider()
+            ReadingPaneDivider()
             ProjectDockAction(
                 glyph = "+",
                 icon = Icons.Outlined.CreateNewFolder,
@@ -247,8 +251,10 @@ private fun ProjectDockAction(
     trailingContent: (@Composable () -> Unit)? = null,
 ) {
     val semanticColors = LocalHermesSemanticColors.current
+    val paper = LocalReadingProfile.current == ReadingProfile.Paper
     val containerColor = when {
         accent -> semanticColors.active
+        paper -> MaterialTheme.colorScheme.surface
         selected -> MaterialTheme.colorScheme.primaryContainer
         else -> MaterialTheme.colorScheme.surfaceContainer
     }
@@ -270,6 +276,11 @@ private fun ProjectDockAction(
         shape = MaterialTheme.shapes.medium,
         color = containerColor,
         contentColor = contentColor,
+        border = if (paper && selected) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        } else {
+            null
+        },
         modifier = actionModifier.semantics {
             contentDescription = description
             this.selected = selected
@@ -328,7 +339,7 @@ private fun ProjectDockControl(
     Surface(
         onClick = onClick,
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = readingPaneColor(MaterialTheme.colorScheme.surfaceContainer),
         modifier = modifier
             .size(48.dp)
             .semantics { contentDescription = description },

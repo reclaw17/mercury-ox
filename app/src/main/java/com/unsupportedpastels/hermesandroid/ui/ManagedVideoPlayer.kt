@@ -23,6 +23,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -299,7 +300,9 @@ internal fun ManagedVideoBlock(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        CircularProgressIndicator(color = Color.White)
+                        if (!paperSuppressesMotion()) {
+                            CircularProgressIndicator(color = Color.White)
+                        }
                         Text("Loading video…", color = Color.White)
                     }
                 }

@@ -269,10 +269,10 @@ private fun ProgressRow(row: SessionProgressItem, kind: ActivitySheetProgressRow
                 tint = MaterialTheme.colorScheme.tertiary,
             )
             ActivitySheetProgressRowKind.Active -> if (paperSuppressesMotion()) {
-                StaticWorkMark(
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    color = MaterialTheme.colorScheme.primary,
+                Text(
+                    "Running",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             } else {
                 CircularProgressIndicator(
@@ -325,11 +325,24 @@ private fun ActivitySheetToolRow(tool: RunToolRow, live: Boolean) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (running && live && !paperSuppressesMotion()) CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp,
-            color = LocalHermesSemanticColors.current.active)
-        else if (running) Text("•", style = MaterialTheme.typography.bodySmall)
-        else Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(16.dp),
-            tint = LocalHermesSemanticColors.current.completed)
+        if (running && paperSuppressesMotion()) {
+            Text("Running", style = MaterialTheme.typography.labelMedium)
+        } else if (running && live) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(14.dp),
+                strokeWidth = 2.dp,
+                color = LocalHermesSemanticColors.current.active,
+            )
+        } else if (running) {
+            Text("•", style = MaterialTheme.typography.bodySmall)
+        } else {
+            Icon(
+                Icons.Outlined.Check,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = LocalHermesSemanticColors.current.completed,
+            )
+        }
         Text(tool.name + detail?.let { " · $it" }.orEmpty(),
             style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }

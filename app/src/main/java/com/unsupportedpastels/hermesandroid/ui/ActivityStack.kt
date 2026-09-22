@@ -40,6 +40,7 @@ import com.unsupportedpastels.mercury.core.activity.ActivityPresentationPolicy
 import com.unsupportedpastels.hermesandroid.app.RunTodoStatus
 import com.unsupportedpastels.hermesandroid.app.RunToolRow
 import com.unsupportedpastels.hermesandroid.app.RunToolState
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 
 /**
  * The selected controller's bounded activity surface. This is deliberately a
@@ -115,11 +116,19 @@ internal fun ActivityStack(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (presentation.assistantActive) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                    if (paperSuppressesMotion()) {
+                        Text(
+                            "Running",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    } else {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 } else if (presentation.processOnly) {
                     Icon(
                         Icons.Outlined.Terminal,

@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material3.Button
+import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -111,7 +112,9 @@ internal fun RelayConnectPanel(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CircularProgressIndicator()
+                if (!paperSuppressesMotion()) {
+                    CircularProgressIndicator()
+                }
                 Text("Pairing securely…")
             }
             is RelayPairingPhase.AwaitingApproval -> {

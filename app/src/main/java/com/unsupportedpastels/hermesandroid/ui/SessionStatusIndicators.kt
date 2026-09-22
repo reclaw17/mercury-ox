@@ -1,8 +1,6 @@
 package com.unsupportedpastels.hermesandroid.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,7 +26,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -116,13 +113,7 @@ internal fun RunStatusPill(status: RunStatus) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (paperSuppressesMotion()) {
-                StaticWorkMark(
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                )
-            } else {
+            if (!paperSuppressesMotion()) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(14.dp),
                     strokeWidth = 2.dp,
@@ -171,9 +162,10 @@ internal fun RunToolRowContent(tool: RunToolRow) {
     ) {
         when (tool.state) {
             RunToolState.Running -> if (paperSuppressesMotion()) {
-                StaticWorkMark(
-                    contentDescription = "Running",
-                    modifier = Modifier.size(16.dp),
+                Text(
+                    "Running",
+                    modifier = Modifier.semantics { contentDescription = "Running" },
+                    style = MaterialTheme.typography.labelMedium,
                     color = semanticColors.active,
                 )
             } else {
@@ -227,23 +219,4 @@ internal fun RunToolRowContent(tool: RunToolRow) {
             )
         }
     }
-}
-
-@Composable
-internal fun StaticWorkMark(
-    contentDescription: String?,
-    modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.primary,
-) {
-    Box(
-        modifier
-            .background(color, CircleShape)
-            .then(
-                if (contentDescription != null) {
-                    Modifier.semantics { this.contentDescription = contentDescription }
-                } else {
-                    Modifier
-                },
-            ),
-    )
 }
