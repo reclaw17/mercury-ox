@@ -158,7 +158,7 @@ class RemoteMediaImageUiTest {
             composeRule.setContent {
                 if (showSession.value) {
                     HermesAndroidTheme(profile = ReadingProfile.Paper) {
-                        sessionScreen(ReadingProfile.Paper)
+                        SessionScreen(ReadingProfile.Paper)
                     }
                 }
             }
@@ -190,7 +190,7 @@ class RemoteMediaImageUiTest {
             composeRule.setContent {
                 if (showSession.value) {
                     HermesAndroidTheme(profile = ReadingProfile.Standard) {
-                        sessionScreen(ReadingProfile.Standard)
+                        SessionScreen(ReadingProfile.Standard)
                     }
                 }
             }
@@ -208,7 +208,7 @@ class RemoteMediaImageUiTest {
     private fun tinyBitmap() = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888).asImageBitmap()
 
     @androidx.compose.runtime.Composable
-    private fun sessionScreen(profile: ReadingProfile) {
+    private fun SessionScreen(profile: ReadingProfile) {
         SessionDetailScreen(
             session = SessionSummary(
                 id = DurableSessionId("media-limits"),
