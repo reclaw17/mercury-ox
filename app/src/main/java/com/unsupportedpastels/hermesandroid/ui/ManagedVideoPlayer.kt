@@ -23,6 +23,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
+import com.unsupportedpastels.hermesandroid.theme.LocalReadingProfile
 import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +47,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -74,24 +76,37 @@ private const val MAX_POSTER_DIMENSION = 720
 private const val MAX_POSTER_CACHE_ENTRIES = 8
 
 /** Small in-memory LRU of poster frames keyed by the MEDIA source. */
-private object ManagedVideoPosterRuntime {
-    private val cache = object : LinkedHashMap<String, ImageBitmap>(
-        MAX_POSTER_CACHE_ENTRIES,
-        0.75f,
-        true,
-    ) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap>?): Boolean =
-            size > MAX_POSTER_CACHE_ENTRIES
+internal object ManagedVideoPosterRuntime {
+    private val cache = AccessOrderLruCache<ImageBitmap>(MAX_POSTER_CACHE_ENTRIES)
+
+    fun get(source: String): ImageBitmap? = cache.get(source)
+
+    fun put(source: String, bitmap: ImageBitmap) {
+        cache.put(source, bitmap)
     }
 
-    @Synchronized
-    fun get(source: String): ImageBitmap? = cache[source]
+    fun releasePaperEntries() {
+        cache.removeWhere(::isPaperBitmapCacheKey)
+    }
 
-    @Synchronized
-    fun put(source: String, bitmap: ImageBitmap) {
-        cache[source] = bitmap
+    fun containsForTest(key: String): Boolean = cache.contains(key)
+
+    fun clearForTest() {
+        cache.clear()
     }
 }
+
+internal fun releasePaperVideoPosterBitmaps() {
+    ManagedVideoPosterRuntime.releasePaperEntries()
+}
+
+/**
+ * Playback starts only after an explicit Play press has finished downloading
+ * the file. A ready file with no press, or a press whose download is still
+ * running, stays on the poster.
+ */
+internal fun managedVideoPlayWhenReady(playPressed: Boolean, downloadCompleted: Boolean): Boolean =
+    playPressed && downloadCompleted
 
 private fun posterFileFor(media: ManagedVideoMedia): File =
     File(media.file.parentFile, media.file.nameWithoutExtension + ".jpg")
@@ -143,8 +158,10 @@ private suspend fun extractPosterFrame(file: File, destination: File?): ImageBit
  *
  * Playback is always fed from a fully downloaded, origin-scoped cache file: the
  * bearer token never reaches the player and no streaming URL is embedded in the
- * view hierarchy. Downloaded videos start playing immediately; a poster frame
- * extracted from the file is shown while idle once the video is in cache.
+ * view hierarchy. The poster stays up until Play is pressed and that download
+ * finishes; only then is playWhenReady set.
+ * Paper loading is static text. Standard keeps the scrim and spinner, then
+ * autoplays after that same Play tap.
  */
 // PlayerView.switchTargetView (fullscreen hand-off) is UnstableApi in media3.
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -157,21 +174,28 @@ internal fun ManagedVideoBlock(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val paper = LocalReadingProfile.current == ReadingProfile.Paper
     var media by remember(source) { mutableStateOf<ManagedVideoMedia?>(null) }
     val mediaOwner = remember(source) { ManagedVideoPresentationLease() }
     DisposableEffect(mediaOwner) { onDispose { mediaOwner.close() } }
     var loading by remember(source) { mutableStateOf(false) }
     var error by remember(source) { mutableStateOf<String?>(null) }
+    var playPressed by remember(source) { mutableStateOf(false) }
+    var downloadCompleted by remember(source) { mutableStateOf(false) }
     var playbackError by remember(media) { mutableStateOf<String?>(null) }
     var fullscreen by remember(media) { mutableStateOf(false) }
     var poster by remember(source) { mutableStateOf<ImageBitmap?>(null) }
+    val playbackReady = managedVideoPlayWhenReady(playPressed, downloadCompleted)
 
     // Poster cache entries are keyed by the origin-scoped cache file, never by
     // the raw source path: different servers may reference the same path, and
     // the frame must always come from the file this server's cache owns.
-    fun posterKey(media: ManagedVideoMedia): String = media.file.absolutePath
+    fun posterKey(media: ManagedVideoMedia): String = profileScopedCacheKey(
+        media.file.absolutePath,
+        if (paper) ReadingProfile.Paper else ReadingProfile.Standard,
+    )
 
-    LaunchedEffect(source, onPeekManagedVideo) {
+    LaunchedEffect(source, onPeekManagedVideo, paper) {
         val peek = onPeekManagedVideo ?: return@LaunchedEffect
         val cached = runCatching { peek(source) }.getOrNull() ?: return@LaunchedEffect
         try {
@@ -196,8 +220,11 @@ internal fun ManagedVideoBlock(
         }
     }
 
-    val player = remember(media) {
-        media?.let { loaded ->
+    val player = remember(media, playbackReady) {
+        val loaded = media
+        if (loaded == null || !playbackReady) {
+            null
+        } else {
             ExoPlayer.Builder(context).build().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
@@ -215,8 +242,7 @@ internal fun ManagedVideoBlock(
                     },
                 )
                 prepare()
-                // One tap starts the whole flow: download, then playback.
-                playWhenReady = true
+                playWhenReady = playbackReady
             }
         }
     }
@@ -239,13 +265,18 @@ internal fun ManagedVideoBlock(
             error = "Video playback is unavailable"
             return
         }
+        playPressed = true
         scope.launch {
             loading = true
             error = null
+            downloadCompleted = false
             loader(source).fold(
                 onSuccess = { loaded ->
                     if (!mediaOwner.adopt(loaded)) return@fold
-                    media = loaded
+                    androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
+                        media = loaded
+                        downloadCompleted = true
+                    }
                     val key = posterKey(loaded)
                     if (ManagedVideoPosterRuntime.get(key) == null) {
                         val frame = extractPosterFrame(loaded.file, posterFileFor(loaded))
@@ -272,7 +303,7 @@ internal fun ManagedVideoBlock(
         .fillMaxWidth()
         .aspectRatio(aspect)
         .clip(RoundedCornerShape(8.dp))
-    if (media == null) {
+    if (media == null || !playbackReady) {
         Box(
             modifier = surfaceModifier.background(
                 MaterialTheme.colorScheme.surfaceVariant,
@@ -290,20 +321,27 @@ internal fun ManagedVideoBlock(
             }
             when {
                 onLoadManagedVideo == null -> Text("Video playback is unavailable")
-                loading -> Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(Color.Black.copy(alpha = 0.35f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                loading -> if (paperSuppressesMotion()) {
+                    Text(
+                        "Loading video…",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(Color.Black.copy(alpha = 0.35f))
+                            .testTag("video-loading-scrim"),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        if (!paperSuppressesMotion()) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
                             CircularProgressIndicator(color = Color.White)
+                            Text("Loading video…", color = Color.White)
                         }
-                        Text("Loading video…", color = Color.White)
                     }
                 }
                 error != null -> Column(

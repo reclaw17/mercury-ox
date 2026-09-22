@@ -280,6 +280,16 @@ internal fun SessionDetailScreen(
     DisposableEffect(session.id, deviceSpeechController) {
         onDispose { deviceSpeechController.cancel() }
     }
+    // Paper drops decoded chat images and poster frames when this screen leaves.
+    // Standard keeps the process-wide cache.
+    DisposableEffect(session.id, paperReading) {
+        onDispose {
+            if (paperReading) {
+                releasePaperRemoteImageBitmaps()
+                releasePaperVideoPosterBitmaps()
+            }
+        }
+    }
 
     val attachmentPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments(),

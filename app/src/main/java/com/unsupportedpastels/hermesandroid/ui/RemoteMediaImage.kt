@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.CircularProgressIndicator
+import com.unsupportedpastels.hermesandroid.theme.LocalReadingProfile
 import com.unsupportedpastels.hermesandroid.theme.paperSuppressesMotion
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,9 +66,77 @@ import kotlinx.coroutines.ensureActive
 
 private const val MAX_REMOTE_IMAGE_BYTES = 10 * 1024 * 1024
 private const val MAX_REMOTE_IMAGE_SOURCE_DIMENSION = 16_384
-private const val MAX_REMOTE_IMAGE_RENDER_DIMENSION = 2_048
-private const val MAX_REMOTE_IMAGE_CACHE_ENTRIES = 4
+/** Standard decode cap. Paper uses [PAPER_REMOTE_IMAGE_RENDER_DIMENSION]. */
+internal const val MAX_REMOTE_IMAGE_RENDER_DIMENSION = 2_048
+/** Paper long-edge cap. Standard stays at [MAX_REMOTE_IMAGE_RENDER_DIMENSION]. */
+internal const val PAPER_REMOTE_IMAGE_RENDER_DIMENSION = 1_280
+internal const val MAX_REMOTE_IMAGE_CACHE_ENTRIES = 4
 private const val REMOTE_IMAGE_TIMEOUT_MILLIS = 15_000L
+private const val PAPER_BITMAP_CACHE_PREFIX = "paper\u0000"
+
+internal fun remoteImageRenderDimension(profile: ReadingProfile): Int =
+    if (profile == ReadingProfile.Paper) {
+        PAPER_REMOTE_IMAGE_RENDER_DIMENSION
+    } else {
+        MAX_REMOTE_IMAGE_RENDER_DIMENSION
+    }
+
+/** Power-of-two [android.graphics.BitmapFactory.Options.inSampleSize] until both edges fit. */
+internal fun remoteImageSampleSize(width: Int, height: Int, maxRenderDimension: Int): Int {
+    var sampleSize = 1
+    while (
+        width / sampleSize > maxRenderDimension ||
+        height / sampleSize > maxRenderDimension
+    ) {
+        sampleSize *= 2
+    }
+    return sampleSize
+}
+
+internal fun profileScopedCacheKey(base: String, profile: ReadingProfile): String =
+    if (profile == ReadingProfile.Paper) PAPER_BITMAP_CACHE_PREFIX + base else base
+
+internal fun isPaperBitmapCacheKey(key: String): Boolean =
+    key.startsWith(PAPER_BITMAP_CACHE_PREFIX)
+
+/**
+ * Access-order LRU. Shared by the remote-image cache (cap 4) and, for the same
+ * eviction rule, available to other bitmap caches that must stay bounded.
+ */
+internal class AccessOrderLruCache<V>(private val maxEntries: Int) {
+    init {
+        require(maxEntries > 0)
+    }
+
+    private val entries = object : LinkedHashMap<String, V>(maxEntries, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, V>?): Boolean =
+            size > maxEntries
+    }
+
+    @Synchronized
+    fun get(key: String): V? = entries[key]
+
+    @Synchronized
+    fun put(key: String, value: V) {
+        entries[key] = value
+    }
+
+    @Synchronized
+    fun size(): Int = entries.size
+
+    @Synchronized
+    fun contains(key: String): Boolean = entries.containsKey(key)
+
+    @Synchronized
+    fun clear() {
+        entries.clear()
+    }
+
+    @Synchronized
+    fun removeWhere(predicate: (String) -> Boolean) {
+        entries.keys.filter(predicate).forEach { entries.remove(it) }
+    }
+}
 
 internal fun validateRemoteMediaUrl(value: String): Boolean {
     val uri = runCatching { URI(value) }.getOrNull() ?: return false
@@ -218,25 +287,32 @@ private sealed interface RemoteImageUiState {
     data object Unsupported : RemoteImageUiState
 }
 
-private object RemoteImageRuntime {
-    private val client = HttpClient(CIO) { configureRemoteImageHttpClient() }
-    val downloader = RemoteImageDownloader(client)
-    private val cache = object : LinkedHashMap<String, ImageBitmap>(
-        MAX_REMOTE_IMAGE_CACHE_ENTRIES,
-        0.75f,
-        true,
-    ) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap>?): Boolean =
-            size > MAX_REMOTE_IMAGE_CACHE_ENTRIES
-    }
+internal object RemoteImageRuntime {
+    private val client by lazy { HttpClient(CIO) { configureRemoteImageHttpClient() } }
+    val downloader by lazy { RemoteImageDownloader(client) }
+    private val cache = AccessOrderLruCache<ImageBitmap>(MAX_REMOTE_IMAGE_CACHE_ENTRIES)
 
-    @Synchronized
-    fun cached(url: String): ImageBitmap? = cache[url]
+    fun cached(url: String): ImageBitmap? = cache.get(url)
 
-    @Synchronized
     fun cache(url: String, bitmap: ImageBitmap) {
-        cache[url] = bitmap
+        cache.put(url, bitmap)
     }
+
+    fun releasePaperEntries() {
+        cache.removeWhere(::isPaperBitmapCacheKey)
+    }
+
+    fun sizeForTest(): Int = cache.size()
+
+    fun containsForTest(key: String): Boolean = cache.contains(key)
+
+    fun clearForTest() {
+        cache.clear()
+    }
+}
+
+internal fun releasePaperRemoteImageBitmaps() {
+    RemoteImageRuntime.releasePaperEntries()
 }
 
 @Composable
@@ -247,7 +323,11 @@ internal fun RemoteMediaImage(
     onImageClick: (() -> Unit)? = null,
 ) {
     val scope = LocalManagedImageScope.current
-    val cacheKey = if (source.startsWith('/')) "$scope|$source" else source
+    val profile = LocalReadingProfile.current
+    val cacheKey = profileScopedCacheKey(
+        base = if (source.startsWith('/')) "$scope|$source" else source,
+        profile = profile,
+    )
     androidx.compose.runtime.key(cacheKey) {
     val state by produceState<RemoteImageUiState>(
         initialValue = RemoteImageRuntime.cached(cacheKey)
@@ -277,7 +357,7 @@ internal fun RemoteMediaImage(
             }
             when (result) {
                 is RemoteImageDownloadResult.Success -> {
-                    val bitmap = decodeRemoteImage(result.bytes)
+                    val bitmap = decodeRemoteImage(result.bytes, profile)
                     if (bitmap == null) {
                         RemoteImageUiState.Failed
                     } else {
@@ -432,7 +512,10 @@ internal fun LoadedRemoteMediaImage(
     }
 }
 
-private fun decodeRemoteImage(bytes: ByteArray): ImageBitmap? {
+internal fun decodeRemoteImage(
+    bytes: ByteArray,
+    profile: ReadingProfile = ReadingProfile.Standard,
+): ImageBitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
     val width = bounds.outWidth
@@ -443,13 +526,7 @@ private fun decodeRemoteImage(bytes: ByteArray): ImageBitmap? {
         height > MAX_REMOTE_IMAGE_SOURCE_DIMENSION
     ) return null
 
-    var sampleSize = 1
-    while (
-        width / sampleSize > MAX_REMOTE_IMAGE_RENDER_DIMENSION ||
-        height / sampleSize > MAX_REMOTE_IMAGE_RENDER_DIMENSION
-    ) {
-        sampleSize *= 2
-    }
+    val sampleSize = remoteImageSampleSize(width, height, remoteImageRenderDimension(profile))
     val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
     return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
 }
