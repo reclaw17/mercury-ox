@@ -153,16 +153,19 @@ class RemoteMediaImageUiTest {
         RemoteImageRuntime.cache(standardImage, tinyBitmap())
         ManagedVideoPosterRuntime.put(paperPoster, tinyBitmap())
         ManagedVideoPosterRuntime.put(standardPoster, tinyBitmap())
+        val showSession = androidx.compose.runtime.mutableStateOf(true)
         try {
             composeRule.setContent {
-                HermesAndroidTheme(profile = ReadingProfile.Paper) {
-                    sessionScreen(ReadingProfile.Paper)
+                if (showSession.value) {
+                    HermesAndroidTheme(profile = ReadingProfile.Paper) {
+                        sessionScreen(ReadingProfile.Paper)
+                    }
                 }
             }
             composeRule.waitForIdle()
             org.junit.Assert.assertTrue(RemoteImageRuntime.containsForTest(paperImage))
             org.junit.Assert.assertTrue(ManagedVideoPosterRuntime.containsForTest(paperPoster))
-            composeRule.setContent { }
+            composeRule.runOnIdle { showSession.value = false }
             composeRule.waitForIdle()
             org.junit.Assert.assertFalse(RemoteImageRuntime.containsForTest(paperImage))
             org.junit.Assert.assertFalse(ManagedVideoPosterRuntime.containsForTest(paperPoster))
@@ -182,14 +185,17 @@ class RemoteMediaImageUiTest {
         ManagedVideoPosterRuntime.clearForTest()
         RemoteImageRuntime.cache(standardImage, tinyBitmap())
         ManagedVideoPosterRuntime.put(standardPoster, tinyBitmap())
+        val showSession = androidx.compose.runtime.mutableStateOf(true)
         try {
             composeRule.setContent {
-                HermesAndroidTheme(profile = ReadingProfile.Standard) {
-                    sessionScreen(ReadingProfile.Standard)
+                if (showSession.value) {
+                    HermesAndroidTheme(profile = ReadingProfile.Standard) {
+                        sessionScreen(ReadingProfile.Standard)
+                    }
                 }
             }
             composeRule.waitForIdle()
-            composeRule.setContent { }
+            composeRule.runOnIdle { showSession.value = false }
             composeRule.waitForIdle()
             org.junit.Assert.assertTrue(RemoteImageRuntime.containsForTest(standardImage))
             org.junit.Assert.assertTrue(ManagedVideoPosterRuntime.containsForTest(standardPoster))
